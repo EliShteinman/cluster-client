@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cluster-client"
+version = "0.1.0"
+description = "Client for the Redis Enterprise REST API of the clusters in its network; validates every response against a schema"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.110",
+    "jsonschema>=4.23",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "requests>=2.32",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27",
+    "pre-commit>=4",
+    "pytest>=8",
+    "pytest-cov>=6",
+    "ruff>=0.17",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]
+markers = [
+    "unit: isolated, no I/O beyond memory",
+    "integration: several real components together",
+    "e2e: the real server over real HTTP",
+]
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "RUF", "PT", "BLE", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]

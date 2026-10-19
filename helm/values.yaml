@@ -1,0 +1,82 @@
+replicaCount: 1
+
+image:
+  repository: cluster-client
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+containerPort: 8000
+
+health:
+  # must match the routes in app/routes/health_routes.py
+  livenessPath: /health/live
+  readinessPath: /health/ready
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+# Plain settings, rendered into a ConfigMap. Keys are CLUSTER_CLIENT_* env vars (see .env.example).
+config:
+  CLUSTER_CLIENT_LOG__LEVEL: INFO
+  CLUSTER_CLIENT_LOG__CONSOLE__FORMAT: json
+  CLUSTER_CLIENT_LOG__FILE__ENABLED: "false"
+  CLUSTER_CLIENT_LOG__FAILURE_FILE__ENABLED: "true"
+
+# The JSON Schema every Redis response must match. Mounted as a file, read at startup.
+# Replace it without rebuilding the image: --set-file responseSchema=path/to/schema.json
+responseSchema: |
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+  }
+
+# Field paths removed from every response before the schema check (fields that are never needed).
+# Same format as "field" in a rejection, with [*] for every item: ["$[*].shards_placement"]
+# Replace it without rebuilding the image: --set-file ignoredFields=path/to/ignored-fields.json
+ignoredFields: |
+  []
+
+# Names of existing Secrets whose keys become env vars (credentials never go in values).
+envFromSecrets: []
+
+logsVolume:
+  mountPath: /app/logs
+  sizeLimit: 512Mi
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

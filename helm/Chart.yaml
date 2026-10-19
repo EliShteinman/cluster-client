@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cluster-client
+description: Client for the Redis Enterprise REST API of the clusters in its network
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

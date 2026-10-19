@@ -1,0 +1,5 @@
+cluster-client is deployed as {{ include "cluster-client.fullname" . }} in namespace {{ .Release.Namespace }}.
+
+Check it locally:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "cluster-client.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://127.0.0.1:8080{{ .Values.health.readinessPath }}

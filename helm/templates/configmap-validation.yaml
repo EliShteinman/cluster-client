@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cluster-client.fullname" . }}-validation
+  labels:
+    {{- include "cluster-client.labels" . | nindent 4 }}
+data:
+  response-schema.json: |
+    {{- .Values.responseSchema | nindent 4 }}
+  ignored-fields.json: |
+    {{- .Values.ignoredFields | nindent 4 }}

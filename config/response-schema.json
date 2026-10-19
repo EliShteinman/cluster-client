@@ -1,0 +1,4 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Placeholder: accepts any JSON. Replace with the schema the firewall enforces."
+}

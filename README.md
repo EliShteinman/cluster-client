@@ -45,7 +45,8 @@ cluster and returned in the response. The headers in `CLUSTER_CLIENT_FORWARDING_
 |---|---|---|
 | Answer matches the schema | the cluster's | the cluster's, unchanged (with its headers) |
 | Answer is not JSON or breaks the schema | 502 | `{"error": "response_rejected", "reason", "field"}` |
-| Cluster cannot be reached | 502 | `{"error": "cluster_unreachable", "reason"}` |
+| Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `{"error": "connection_failed", "reason"}` |
+| Request sent, no full answer (read timeout, connection cut) | 504 | `{"error": "timeout", "reason"}` |
 | A required header is missing or invalid | 400 | the validation errors |
 
 Status codes and error codes are set by `CLUSTER_CLIENT_FAILURES__*`.

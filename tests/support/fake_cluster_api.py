@@ -3,6 +3,7 @@ import json
 import requests
 from pydantic import JsonValue
 from requests.structures import CaseInsensitiveDict
+from urllib3.exceptions import MaxRetryError
 
 from app.config import TEXT_ENCODING
 
@@ -21,7 +22,7 @@ class FakeClusterApi:
         self._status_code: int = 200
         self._headers: dict[str, str] = {}
         self._content: bytes = b'{"uid":1}'
-        self._offline: bool = False
+        self._error: requests.RequestException | None = None
 
     def respond_with_json(
         self, *, status_code: int, body: JsonValue, headers: dict[str, str] | None = None
@@ -40,14 +41,17 @@ class FakeClusterApi:
         self._headers = headers or {}
 
     def go_offline(self) -> None:
-        self._offline = True
+        self.fail_with(error=requests.ConnectionError(MaxRetryError(pool=None, url="/", reason="refused")))
+
+    def fail_with(self, *, error: requests.RequestException) -> None:
+        self._error = error
 
     def request(
         self, *, method: str, url: str, headers: dict[str, str], data: bytes, timeout: float, verify: bool
     ) -> requests.Response:
         self.requests.append(SentRequest(method=method, url=url, headers=headers, data=data))
-        if self._offline:
-            raise requests.ConnectionError("connection refused")
+        if self._error is not None:
+            raise self._error
         response: requests.Response = requests.Response()
         response.status_code = self._status_code
         response.headers = CaseInsensitiveDict(data=self._headers)

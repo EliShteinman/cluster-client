@@ -4,13 +4,14 @@ import logging
 import pytest
 
 from app.config import FailureSettings, Settings
-from app.errors import ClusterUnreachableError, RequestFailedError, ResponseRejectedError
+from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError, ResponseRejectedError
 from app.failures import failure_code, failure_record, failure_response, record_failure
 from app.models import ClusterResponse, RequestFailure
 from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
 
 SETTINGS: Settings = Settings(_env_file=None)
-UNREACHABLE: ClusterUnreachableError = ClusterUnreachableError(url=CLUSTER_URL, reason="refused")
+CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=CLUSTER_URL, reason="refused")
+NO_RESPONSE: NoResponseError = NoResponseError(url=CLUSTER_URL, reason="read timed out")
 REJECTION: ResponseRejectedError = ResponseRejectedError(
     field="$.uid", reason="'one' is not of type 'integer'"
 )
@@ -18,7 +19,8 @@ CLUSTER_RESPONSE: ClusterResponse = ClusterResponse(status_code=200, content=b'{
 
 
 @pytest.mark.parametrize(
-    ("failure", "error_code"), [(UNREACHABLE, "cluster_unreachable"), (REJECTION, "response_rejected")]
+    ("failure", "error_code"),
+    [(CONNECTION_FAILED, "connection_failed"), (NO_RESPONSE, "timeout"), (REJECTION, "response_rejected")],
 )
 def test_each_failure_gets_its_configured_code(failure: RequestFailedError, error_code: str) -> None:
     assert failure_code(failure=failure, settings=FailureSettings()).error_code == error_code
@@ -26,7 +28,7 @@ def test_each_failure_gets_its_configured_code(failure: RequestFailedError, erro
 
 def test_record_without_cluster_response_has_no_cluster_fields() -> None:
     record: RequestFailure = failure_record(
-        request=CLUSTER_REQUEST, failure=UNREACHABLE, cluster_response=None, settings=SETTINGS.failures
+        request=CLUSTER_REQUEST, failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS.failures
     )
 
     assert (record.cluster_status_code, record.cluster_response) == (None, None)
@@ -83,10 +85,10 @@ def test_response_body_describes_the_failure() -> None:
 
 
 def test_response_body_omits_a_missing_field() -> None:
-    assert "field" not in json.loads(s=failure_response(failure=UNREACHABLE, settings=SETTINGS).content)
+    assert "field" not in json.loads(s=failure_response(failure=CONNECTION_FAILED, settings=SETTINGS).content)
 
 
 def test_response_has_the_configured_content_type() -> None:
-    assert failure_response(failure=UNREACHABLE, settings=SETTINGS).headers == {
+    assert failure_response(failure=CONNECTION_FAILED, settings=SETTINGS).headers == {
         "content-type": "application/json"
     }

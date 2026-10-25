@@ -77,7 +77,10 @@ class FailureCode(FrozenModel):
 class FailureSettings(FrozenModel):
     invalid_request_status_code: ErrorStatusCode = Field(default=400)
     rejected: FailureCode = Field(default=FailureCode(status_code=502, error_code="response_rejected"))
-    unreachable: FailureCode = Field(default=FailureCode(status_code=502, error_code="cluster_unreachable"))
+    connection_failed: FailureCode = Field(
+        default=FailureCode(status_code=502, error_code="connection_failed")
+    )
+    no_response: FailureCode = Field(default=FailureCode(status_code=504, error_code="timeout"))
     content_type: str = Field(default="application/json")
 
 

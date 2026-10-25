@@ -27,5 +27,13 @@ class ClusterUnreachableError(RequestFailedError):
         super().__init__(reason=f"cannot reach {url}: {reason}")
 
 
+class ConnectionFailedError(ClusterUnreachableError):
+    pass
+
+
+class NoResponseError(ClusterUnreachableError):
+    pass
+
+
 class ResponseRejectedError(RequestFailedError):
     pass

@@ -59,7 +59,7 @@ def test_schema_violation_is_rejected_with_the_failing_field(
 def test_unreachable_cluster_is_reported(client: TestClient, fake_cluster: FakeClusterApi) -> None:
     fake_cluster.go_offline()
 
-    assert send(client=client).json()["error"] == "cluster_unreachable"
+    assert send(client=client).json()["error"] == "connection_failed"
 
 
 def test_configured_headers_reach_the_cluster(client: TestClient, fake_cluster: FakeClusterApi) -> None:

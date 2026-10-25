@@ -1,10 +1,11 @@
 import pytest
 import requests
 from requests.structures import CaseInsensitiveDict
+from urllib3.exceptions import MaxRetryError, ProtocolError
 
 from app.cluster_client import outgoing_headers, returned_headers, send_to_cluster
 from app.config import ForwardingSettings, TracingSettings
-from app.errors import ClusterUnreachableError
+from app.errors import ClusterUnreachableError, ConnectionFailedError, NoResponseError
 from app.logger.tracing import TraceContext, bind_trace_context, parse_traceparent
 from app.models import ClusterRequest, ClusterResponse
 from tests.support.fake_cluster_api import FakeClusterApi, SentRequest
@@ -16,6 +17,7 @@ TRACE: TraceContext = TraceContext(trace_id="4bf92f3577b34da6a3ce929d0e0e4736", 
 FULL_REQUEST: ClusterRequest = ClusterRequest(
     method="POST", url=CLUSTER_URL, authorization="Basic abc", content_type="application/json", body=b"{}"
 )
+CONNECT_FAILURE: MaxRetryError = MaxRetryError(pool=None, url="/", reason="refused")
 
 
 def send(*, request: ClusterRequest) -> ClusterResponse:
@@ -103,4 +105,24 @@ def test_unreachable_cluster_raises(fake_cluster: FakeClusterApi) -> None:
     fake_cluster.go_offline()
 
     with pytest.raises(ClusterUnreachableError, match="cluster:9443"):
+        send(request=CLUSTER_REQUEST)
+
+
+@pytest.mark.parametrize(
+    ("error", "raised"),
+    [
+        (requests.ConnectionError(CONNECT_FAILURE), ConnectionFailedError),
+        (requests.ConnectTimeout(CONNECT_FAILURE), ConnectionFailedError),
+        (requests.ConnectionError(ProtocolError("Connection aborted.")), NoResponseError),
+        (requests.ReadTimeout("read timed out"), NoResponseError),
+        (requests.exceptions.ChunkedEncodingError(ProtocolError("incomplete")), NoResponseError),
+    ],
+    ids=["refused", "connect timeout", "closed after send", "read timeout", "cut answer"],
+)
+def test_failure_says_whether_the_request_was_sent(
+    fake_cluster: FakeClusterApi, error: requests.RequestException, raised: type[ClusterUnreachableError]
+) -> None:
+    fake_cluster.fail_with(error=error)
+
+    with pytest.raises(raised):
         send(request=CLUSTER_REQUEST)

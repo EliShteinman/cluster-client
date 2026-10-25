@@ -21,8 +21,9 @@ one visible call:
 2. `read_cluster_request` (`app/routes/read_request.py`) turns the incoming headers + body into a
    `ClusterRequest`, including the configured pass-through headers. Missing/invalid header → HTTP 400 (status
    from config). Nothing is sent to the cluster.
-3. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`. Connection error or timeout →
-   `ClusterUnreachableError`.
+3. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`. Any `RequestException` →
+   `ConnectionFailedError` when the request surely did not leave (`requests` wraps it in `MaxRetryError`:
+   refused, DNS, connect timeout), else `NoResponseError` (read timeout, connection cut after sending).
 4. `build_response` (`app/response_builder.py`):
    - empty body (e.g. 204) → returned as is;
    - decode JSON (not JSON → `ResponseRejectedError`, field `$`);
@@ -44,12 +45,12 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/config/settings.py` | **every** setting (Pydantic Settings, env prefix `CLUSTER_CLIENT_`, nested `__`), `TEXT_ENCODING`, `FrozenModel` |
 | `app/models.py` | `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
-| `app/errors.py` | `ClusterClientError` → `SchemaLoadError`, `FieldPathsLoadError`, `RequestFailedError` → `ClusterUnreachableError`, `ResponseRejectedError` |
+| `app/errors.py` | `ClusterClientError` → `SchemaLoadError`, `FieldPathsLoadError`, `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
 | `app/routes/__init__.py` | creates `cluster_router` and `health_router`; route files import them |
 | `app/routes/cluster_routes.py` | `POST /` orchestrator |
 | `app/routes/read_request.py` | `read_body` (async, see below) and `read_cluster_request` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
-| `app/cluster_client.py` | `send_to_cluster`, `outgoing_headers`, `returned_headers` |
+| `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |
 | `app/response_builder.py` | `build_response`, `decode_body`, `encode_body` |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `read_schema_file`, `validate_body` |

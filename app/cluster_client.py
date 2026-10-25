@@ -1,9 +1,9 @@
 import requests
 import urllib3
-from urllib3.exceptions import InsecureRequestWarning
+from urllib3.exceptions import InsecureRequestWarning, MaxRetryError
 
 from app.config import ForwardingSettings, TracingSettings
-from app.errors import ClusterUnreachableError
+from app.errors import ClusterUnreachableError, ConnectionFailedError, NoResponseError
 from app.logger import log_debug, log_info
 from app.logger.tracing import trace_headers
 from app.models import ClusterRequest, ClusterResponse
@@ -25,12 +25,26 @@ def send_to_cluster(
             timeout=settings.timeout_seconds,
             verify=False,  # noqa: S501 - the clusters use internal certificates; the client does not verify them
         )
-    except (requests.ConnectionError, requests.Timeout) as error:
-        raise ClusterUnreachableError(url=str(request.url), reason=str(error)) from error
+    except requests.RequestException as error:
+        raise unreachable_error(url=str(request.url), error=error) from error
     return ClusterResponse(
         status_code=response.status_code,
         headers=returned_headers(response=response, settings=settings),
         content=response.content,
+    )
+
+
+@log_debug
+def unreachable_error(*, url: str, error: requests.RequestException) -> ClusterUnreachableError:
+    if was_not_sent(error=error):
+        return ConnectionFailedError(url=url, reason=str(error))
+    return NoResponseError(url=url, reason=str(error))
+
+
+@log_debug
+def was_not_sent(*, error: requests.RequestException) -> bool:
+    return isinstance(error, requests.ConnectionError) and any(
+        isinstance(argument, MaxRetryError) for argument in error.args
     )
 
 

@@ -1,14 +1,18 @@
 import logging
 
 from app.config import TEXT_ENCODING, FailureCode, FailureSettings, Settings
-from app.errors import ClusterUnreachableError, RequestFailedError
+from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError
 from app.logger import log_debug
 from app.models import ClusterRequest, ClusterResponse, FailureBody, RequestFailure
 
 
 @log_debug
 def failure_code(*, failure: RequestFailedError, settings: FailureSettings) -> FailureCode:
-    return settings.unreachable if isinstance(failure, ClusterUnreachableError) else settings.rejected
+    if isinstance(failure, ConnectionFailedError):
+        return settings.connection_failed
+    if isinstance(failure, NoResponseError):
+        return settings.no_response
+    return settings.rejected
 
 
 @log_debug

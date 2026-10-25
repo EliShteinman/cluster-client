@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 
-from app.config import Settings
-from app.errors import SchemaLoadError
+from app.config import ConsoleSettings, FailureFileSettings, LoggingSettings, Settings, ValidationSettings
+from app.errors import FieldPathsLoadError, SchemaLoadError
 from app.logger.tracing import TraceContext, parse_traceparent
 from app.main import create_app
 from tests.support.app_settings import make_app_settings
@@ -86,6 +86,16 @@ def test_configured_headers_reach_the_cluster(client: TestClient, fake_cluster: 
     assert fake_cluster.requests[0].headers["cluster-state-id"] == "155"
 
 
+def test_redacted_field_is_not_in_the_failure_file(
+    client: TestClient, fake_cluster: FakeClusterApi, failure_lines: JsonLines
+) -> None:
+    fake_cluster.respond_with_json(status_code=200, body={"uid": 1, "authentication_admin_pass": "s3cret"})
+
+    send(client=client)
+
+    assert "s3cret" not in str(failure_lines()[-1]["extra"]["cluster_response"])
+
+
 def test_rejection_is_written_to_the_failure_file(
     client: TestClient, fake_cluster: FakeClusterApi, failure_lines: JsonLines
 ) -> None:
@@ -140,4 +150,22 @@ def test_missing_schema_stops_startup(log_path: Path, failure_log_path: Path, tm
     )
 
     with pytest.raises(SchemaLoadError), TestClient(app=create_app(settings=settings)):
+        pass
+
+
+def test_missing_redacted_fields_file_stops_startup(
+    failure_log_path: Path, schema_path: Path, tmp_path: Path
+) -> None:
+    settings: Settings = Settings(
+        _env_file=None,
+        validation=ValidationSettings(schema_path=schema_path),
+        log=LoggingSettings(
+            console=ConsoleSettings(enabled=False),
+            failure_file=FailureFileSettings(
+                path=failure_log_path, redacted_fields_path=tmp_path / "missing.json"
+            ),
+        ),
+    )
+
+    with pytest.raises(FieldPathsLoadError), TestClient(app=create_app(settings=settings)):
         pass

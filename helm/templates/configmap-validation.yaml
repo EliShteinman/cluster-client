@@ -9,3 +9,5 @@ data:
     {{- .Values.responseSchema | nindent 4 }}
   ignored-fields.json: |
     {{- .Values.ignoredFields | nindent 4 }}
+  redacted-fields.json: |
+    {{- .Values.redactedFields | nindent 4 }}

@@ -31,9 +31,9 @@ one visible call:
    - `validate_body` (`app/schema.py`) checks the JSON Schema (violation → `ResponseRejectedError` with the
      failing field, e.g. `$.uid`);
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
-5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file, then
-   `failure_response` builds the answer with `x-edge-error`, and on a rejection `x-edge-cluster-status`
-   (`app/failures.py`).
+5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file (redacted
+   fields left out of the cluster response), then `failure_response` builds the answer with `x-edge-error`,
+   and on a rejection `x-edge-cluster-status` (`app/failures.py`).
 6. The route returns status + headers + body; the middleware adds `traceparent`.
 
 Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/diagrams/class-diagram.drawio`.
@@ -42,7 +42,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 
 | File | Contents |
 |---|---|
-| `app/main.py` | `create_app(settings)` (factory) and `lifespan` (startup: configure logging, load schema + ignored fields into `app.state`) |
+| `app/main.py` | `create_app(settings)` (factory) and `lifespan` (startup: configure logging, load schema, ignored and redacted fields into `app.state`) |
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/config/settings.py` | **every** setting (Pydantic Settings, env prefix `CLUSTER_CLIENT_`, nested `__`), `TEXT_ENCODING`, `FrozenModel` |
 | `app/models.py` | `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
@@ -55,12 +55,12 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/response_builder.py` | `build_response`, `decode_body`, `encode_body` |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `read_schema_file`, `validate_body` |
-| `app/failures.py` | `failure_code`, `record_failure`, `failure_record`, `failure_response` |
+| `app/failures.py` | `failure_code`, `record_failure`, `failure_record`, `redacted_content`, `failure_response` |
 | `app/logger/setup.py` | handlers (terminal / file / failure file), JSON + line formatters, `configure_logging` |
 | `app/logger/decorators.py` | `log_debug`, `log_info` |
 | `app/logger/tracing.py` | W3C traceparent parse/format, context var, log filter, `TraceMiddleware` |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
-| `config/response-schema.json`, `config/ignored-fields.json` | the two runtime files (never baked into the image) |
+| `config/response-schema.json`, `config/ignored-fields.json`, `config/redacted-fields.json` | the three runtime files (never baked into the image) |
 
 ## Mandatory coding rules (the owner enforces these strictly)
 
@@ -94,9 +94,10 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - **Ignored field paths** use the same format as the `field` of a rejection: `$.a.b`, `[*]` for every list item
   (`$[*].shards_placement`). Indexes like `[0]` and paths ending in `[*]` are rejected at startup.
 - **Failure file** (`logs/failures.log`, logger `cluster_client.failures`): one JSON line per failed request,
-  including the full cluster response. Find it by the `trace_id` the manager got back in `traceparent`.
+  including the cluster response without the redacted fields (`config/redacted-fields.json`: the passwords
+  Redis returns in bdb and crdb answers). DEBUG logs everything, on purpose.
 - **Pass-through headers** (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent as they are; the
-  client's own authorization, content-type and traceparent always win over them.
+  client's own authorization, content-type and traceparent always win over them. Find it by the `trace_id` the manager got back in `traceparent`.
 - The error `reason` from `requests` is long; the owner chose to keep it as is.
 
 ## Tests

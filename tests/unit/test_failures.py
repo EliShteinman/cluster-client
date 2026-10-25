@@ -5,7 +5,8 @@ import pytest
 
 from app.config import FailureSettings, Settings
 from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError, ResponseRejectedError
-from app.failures import failure_code, failure_record, failure_response, record_failure
+from app.failures import failure_code, failure_record, failure_response, record_failure, redacted_content
+from app.field_paths import FieldPath
 from app.models import ClusterResponse, RequestFailure
 from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
 
@@ -16,6 +17,17 @@ REJECTION: ResponseRejectedError = ResponseRejectedError(
     field="$.uid", reason="'one' is not of type 'integer'"
 )
 CLUSTER_RESPONSE: ClusterResponse = ClusterResponse(status_code=200, content=b'{"uid": "one"}')
+REDACT_PASSWORD: tuple[FieldPath, ...] = (("password",),)
+
+
+def record(*, cluster_response: ClusterResponse | None) -> RequestFailure:
+    return failure_record(
+        request=CLUSTER_REQUEST,
+        failure=REJECTION,
+        cluster_response=cluster_response,
+        redacted_fields=REDACT_PASSWORD,
+        settings=SETTINGS.failures,
+    )
 
 
 @pytest.mark.parametrize(
@@ -27,40 +39,44 @@ def test_each_failure_gets_its_configured_code(failure: RequestFailedError, erro
 
 
 def test_record_without_cluster_response_has_no_cluster_fields() -> None:
-    record: RequestFailure = failure_record(
-        request=CLUSTER_REQUEST, failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS.failures
-    )
+    failure: RequestFailure = record(cluster_response=None)
 
-    assert (record.cluster_status_code, record.cluster_response) == (None, None)
+    assert (failure.cluster_status_code, failure.cluster_response) == (None, None)
 
 
 def test_record_keeps_the_full_cluster_response() -> None:
-    record: RequestFailure = failure_record(
-        request=CLUSTER_REQUEST,
-        failure=REJECTION,
-        cluster_response=CLUSTER_RESPONSE,
-        settings=SETTINGS.failures,
+    failure: RequestFailure = record(cluster_response=CLUSTER_RESPONSE)
+
+    assert (failure.cluster_status_code, failure.cluster_response) == (200, '{"uid": "one"}')
+
+
+def test_record_leaves_out_the_redacted_fields() -> None:
+    failure: RequestFailure = record(
+        cluster_response=ClusterResponse(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
     )
 
-    assert (record.cluster_status_code, record.cluster_response) == (200, '{"uid": "one"}')
+    assert json.loads(s=failure.cluster_response or "") == {"uid": "one"}
 
 
 def test_record_names_the_request() -> None:
-    record: RequestFailure = failure_record(
-        request=CLUSTER_REQUEST,
-        failure=REJECTION,
-        cluster_response=CLUSTER_RESPONSE,
-        settings=SETTINGS.failures,
-    )
+    failure: RequestFailure = record(cluster_response=CLUSTER_RESPONSE)
 
-    assert (record.method, record.url, record.field) == ("GET", CLUSTER_URL, "$.uid")
+    assert (failure.method, failure.url, failure.field) == ("GET", CLUSTER_URL, "$.uid")
+
+
+def test_content_that_is_not_json_is_kept_as_text() -> None:
+    assert redacted_content(content=b"<html>", redacted_fields=REDACT_PASSWORD) == "<html>"
 
 
 def test_failure_is_written_to_the_failure_logger(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(level=logging.WARNING, logger=SETTINGS.log.failure_file.logger_name)
 
     record_failure(
-        request=CLUSTER_REQUEST, failure=REJECTION, cluster_response=CLUSTER_RESPONSE, settings=SETTINGS
+        request=CLUSTER_REQUEST,
+        failure=REJECTION,
+        cluster_response=CLUSTER_RESPONSE,
+        redacted_fields=(),
+        settings=SETTINGS,
     )
 
     assert caplog.records[-1].cluster_response == '{"uid": "one"}'

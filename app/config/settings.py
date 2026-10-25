@@ -110,6 +110,7 @@ class FailureFileSettings(FileSettings):
     enabled: bool = Field(default=True)
     level: LogLevel = Field(default="WARNING")
     path: Path = Field(default=Path("logs/failures.log"))
+    redacted_fields_path: Path = Field(default=Path("config/redacted-fields.json"))
     logger_name: str = Field(default="cluster_client.failures")
 
 

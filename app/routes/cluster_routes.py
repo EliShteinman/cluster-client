@@ -22,6 +22,7 @@ def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(depende
     settings: Settings = request.app.state.settings
     schema: Draft202012Validator = request.app.state.schema
     ignored_fields: tuple[FieldPath, ...] = request.app.state.ignored_fields
+    redacted_fields: tuple[FieldPath, ...] = request.app.state.redacted_fields
     cluster_request: ClusterRequest = read_cluster_request(
         headers=dict(request.headers), body=body, settings=settings
     )
@@ -35,7 +36,11 @@ def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(depende
         )
     except RequestFailedError as failure:
         record_failure(
-            request=cluster_request, failure=failure, cluster_response=cluster_response, settings=settings
+            request=cluster_request,
+            failure=failure,
+            cluster_response=cluster_response,
+            redacted_fields=redacted_fields,
+            settings=settings,
         )
         cluster_response = failure_response(
             failure=failure, cluster_response=cluster_response, settings=settings

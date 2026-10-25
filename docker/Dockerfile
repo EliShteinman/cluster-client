@@ -21,6 +21,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     CLUSTER_CLIENT_SERVER__PORT=8000 \
     CLUSTER_CLIENT_LOG__FILE__PATH=/app/logs/app.log \
     CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH=/app/logs/failures.log \
+    CLUSTER_CLIENT_LOG__FAILURE_FILE__REDACTED_FIELDS_PATH=/etc/cluster-client/redacted-fields.json \
     CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH=/etc/cluster-client/response-schema.json \
     CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH=/etc/cluster-client/ignored-fields.json
 EXPOSE 8000

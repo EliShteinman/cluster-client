@@ -49,6 +49,32 @@ responseSchema: |
 ignoredFields: |
   []
 
+# Field paths left out of the cluster response written to the failure log (passwords). Same format.
+# Replace it without rebuilding the image: --set-file redactedFields=path/to/redacted-fields.json
+redactedFields: |
+  [
+    "$.authentication_admin_pass",
+    "$.authentication_redis_pass",
+    "$.authentication_sasl_pass",
+    "$[*].authentication_admin_pass",
+    "$[*].authentication_redis_pass",
+    "$[*].authentication_sasl_pass",
+    "$.default_db_config.authentication_admin_pass",
+    "$.default_db_config.authentication_redis_pass",
+    "$.default_db_config.authentication_sasl_pass",
+    "$.instances[*].db_config.authentication_admin_pass",
+    "$.instances[*].db_config.authentication_redis_pass",
+    "$.instances[*].db_config.authentication_sasl_pass",
+    "$.instances[*].cluster.credentials.password",
+    "$.crdbs[*].default_db_config.authentication_admin_pass",
+    "$.crdbs[*].default_db_config.authentication_redis_pass",
+    "$.crdbs[*].default_db_config.authentication_sasl_pass",
+    "$.crdbs[*].instances[*].db_config.authentication_admin_pass",
+    "$.crdbs[*].instances[*].db_config.authentication_redis_pass",
+    "$.crdbs[*].instances[*].db_config.authentication_sasl_pass",
+    "$.crdbs[*].instances[*].cluster.credentials.password"
+  ]
+
 # Names of existing Secrets whose keys become env vars (credentials never go in values).
 envFromSecrets: []
 

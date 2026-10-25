@@ -29,5 +29,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings=settings.log)
     app.state.schema = load_schema(path=settings.validation.schema_path)
     app.state.ignored_fields = load_field_paths(path=settings.validation.ignored_fields_path)
+    app.state.redacted_fields = load_field_paths(path=settings.log.failure_file.redacted_fields_path)
     yield
     reset_logging()

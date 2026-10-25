@@ -1,7 +1,11 @@
+import json
 import logging
+
+from pydantic import JsonValue
 
 from app.config import TEXT_ENCODING, FailureCode, FailureSettings, Settings
 from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError
+from app.field_paths import FieldPath, remove_fields
 from app.logger import log_debug
 from app.models import ClusterRequest, ClusterResponse, FailureBody, RequestFailure
 
@@ -21,10 +25,15 @@ def record_failure(
     request: ClusterRequest,
     failure: RequestFailedError,
     cluster_response: ClusterResponse | None,
+    redacted_fields: tuple[FieldPath, ...],
     settings: Settings,
 ) -> None:
     record: RequestFailure = failure_record(
-        request=request, failure=failure, cluster_response=cluster_response, settings=settings.failures
+        request=request,
+        failure=failure,
+        cluster_response=cluster_response,
+        redacted_fields=redacted_fields,
+        settings=settings.failures,
     )
     logging.getLogger(name=settings.log.failure_file.logger_name).warning(
         msg=f"{record.error}: {record.method} {record.url} {record.reason}",
@@ -38,6 +47,7 @@ def failure_record(
     request: ClusterRequest,
     failure: RequestFailedError,
     cluster_response: ClusterResponse | None,
+    redacted_fields: tuple[FieldPath, ...],
     settings: FailureSettings,
 ) -> RequestFailure:
     record: RequestFailure = RequestFailure(
@@ -52,9 +62,22 @@ def failure_record(
     return record.model_copy(
         update={
             "cluster_status_code": cluster_response.status_code,
-            "cluster_response": cluster_response.content.decode(encoding=TEXT_ENCODING, errors="replace"),
+            "cluster_response": redacted_content(
+                content=cluster_response.content, redacted_fields=redacted_fields
+            ),
         }
     )
+
+
+@log_debug
+def redacted_content(*, content: bytes, redacted_fields: tuple[FieldPath, ...]) -> str:
+    text: str = content.decode(encoding=TEXT_ENCODING, errors="replace")
+    try:
+        body: JsonValue = json.loads(s=text)
+    except json.JSONDecodeError:
+        return text
+    redacted: JsonValue = remove_fields(body=body, field_paths=redacted_fields)
+    return text if redacted == body else json.dumps(obj=redacted, ensure_ascii=False)
 
 
 @log_debug

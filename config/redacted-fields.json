@@ -1,0 +1,22 @@
+[
+  "$.authentication_admin_pass",
+  "$.authentication_redis_pass",
+  "$.authentication_sasl_pass",
+  "$[*].authentication_admin_pass",
+  "$[*].authentication_redis_pass",
+  "$[*].authentication_sasl_pass",
+  "$.default_db_config.authentication_admin_pass",
+  "$.default_db_config.authentication_redis_pass",
+  "$.default_db_config.authentication_sasl_pass",
+  "$.instances[*].db_config.authentication_admin_pass",
+  "$.instances[*].db_config.authentication_redis_pass",
+  "$.instances[*].db_config.authentication_sasl_pass",
+  "$.instances[*].cluster.credentials.password",
+  "$.crdbs[*].default_db_config.authentication_admin_pass",
+  "$.crdbs[*].default_db_config.authentication_redis_pass",
+  "$.crdbs[*].default_db_config.authentication_sasl_pass",
+  "$.crdbs[*].instances[*].db_config.authentication_admin_pass",
+  "$.crdbs[*].instances[*].db_config.authentication_redis_pass",
+  "$.crdbs[*].instances[*].db_config.authentication_sasl_pass",
+  "$.crdbs[*].instances[*].cluster.credentials.password"
+]

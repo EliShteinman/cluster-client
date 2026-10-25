@@ -4,7 +4,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from app.errors import ResponseRejectedError
-from app.ignored_fields import FieldPath
+from app.field_paths import FieldPath
 from app.models import ClusterResponse
 from app.response_builder import build_response
 from tests.support.schemas import DATABASE_SCHEMA

@@ -5,7 +5,7 @@ from pydantic import JsonValue
 
 from app.config import TEXT_ENCODING
 from app.errors import ResponseRejectedError
-from app.ignored_fields import ROOT, FieldPath, remove_ignored_fields
+from app.field_paths import ROOT, FieldPath, remove_fields
 from app.logger import log_debug
 from app.models import ClusterResponse
 from app.schema import validate_body
@@ -18,7 +18,7 @@ def build_response(
     if not cluster_response.content:
         return cluster_response
     original_body: JsonValue = decode_body(content=cluster_response.content)
-    body: JsonValue = remove_ignored_fields(body=original_body, ignored_fields=ignored_fields)
+    body: JsonValue = remove_fields(body=original_body, field_paths=ignored_fields)
     validate_body(body=body, schema=schema)
     if body == original_body:
         return cluster_response

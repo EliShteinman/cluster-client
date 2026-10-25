@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from pydantic import JsonValue
 
-from app.errors import IgnoredFieldsLoadError
-from app.ignored_fields import ALL_ITEMS, FieldPath, load_ignored_fields, remove_ignored_fields
+from app.errors import FieldPathsLoadError
+from app.field_paths import ALL_ITEMS, FieldPath, load_field_paths, remove_fields
 
 DATABASES: list[JsonValue] = [
     {"uid": 1, "shards_placement": "dense", "endpoints": [{"internal_id": 5, "port": 12000}]},
@@ -14,7 +14,7 @@ DATABASES: list[JsonValue] = [
 
 
 def write(*, tmp_path: Path, content: str) -> Path:
-    path: Path = tmp_path / "ignored-fields.json"
+    path: Path = tmp_path / "field-paths.json"
     path.write_text(data=content, encoding="utf-8")
     return path
 
@@ -22,7 +22,7 @@ def write(*, tmp_path: Path, content: str) -> Path:
 def test_paths_are_read_from_the_file(tmp_path: Path) -> None:
     path: Path = write(tmp_path=tmp_path, content=json.dumps(obj=["$[*].endpoints[*].internal_id"]))
 
-    assert load_ignored_fields(path=path) == ((ALL_ITEMS, "endpoints", ALL_ITEMS, "internal_id"),)
+    assert load_field_paths(path=path) == ((ALL_ITEMS, "endpoints", ALL_ITEMS, "internal_id"),)
 
 
 @pytest.mark.parametrize(
@@ -37,13 +37,13 @@ def test_paths_are_read_from_the_file(tmp_path: Path) -> None:
     ids=["not json", "not a list", "no root", "ends in [*]", "item index"],
 )
 def test_unusable_file_is_reported(tmp_path: Path, content: str) -> None:
-    with pytest.raises(IgnoredFieldsLoadError, match=r"ignored-fields\.json"):
-        load_ignored_fields(path=write(tmp_path=tmp_path, content=content))
+    with pytest.raises(FieldPathsLoadError, match=r"field-paths\.json"):
+        load_field_paths(path=write(tmp_path=tmp_path, content=content))
 
 
 def test_missing_file_is_reported(tmp_path: Path) -> None:
-    with pytest.raises(IgnoredFieldsLoadError):
-        load_ignored_fields(path=tmp_path / "missing.json")
+    with pytest.raises(FieldPathsLoadError):
+        load_field_paths(path=tmp_path / "missing.json")
 
 
 @pytest.mark.parametrize(
@@ -62,10 +62,10 @@ def test_missing_file_is_reported(tmp_path: Path) -> None:
     ids=["field in every item", "nested field", "absent field"],
 )
 def test_only_the_named_field_is_removed(field_path: FieldPath, expected: list[JsonValue]) -> None:
-    assert remove_ignored_fields(body=DATABASES, ignored_fields=(field_path,)) == expected
+    assert remove_fields(body=DATABASES, field_paths=(field_path,)) == expected
 
 
 def test_the_original_body_is_left_untouched() -> None:
-    remove_ignored_fields(body=DATABASES, ignored_fields=((ALL_ITEMS, "shards_placement"),))
+    remove_fields(body=DATABASES, field_paths=((ALL_ITEMS, "shards_placement"),))
 
     assert DATABASES[0]["shards_placement"] == "dense"

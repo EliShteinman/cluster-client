@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import Settings
-from app.ignored_fields import load_ignored_fields
+from app.field_paths import load_field_paths
 from app.logger import configure_logging, log_debug, reset_logging
 from app.logger.tracing import TraceMiddleware
 from app.routes import cluster_router, health_router
@@ -28,6 +28,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     configure_logging(settings=settings.log)
     app.state.schema = load_schema(path=settings.validation.schema_path)
-    app.state.ignored_fields = load_ignored_fields(path=settings.validation.ignored_fields_path)
+    app.state.ignored_fields = load_field_paths(path=settings.validation.ignored_fields_path)
     yield
     reset_logging()

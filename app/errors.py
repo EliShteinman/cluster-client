@@ -10,9 +10,9 @@ class SchemaLoadError(ClusterClientError):
         super().__init__(f"cannot load the response schema from {path}: {reason}")
 
 
-class IgnoredFieldsLoadError(ClusterClientError):
+class FieldPathsLoadError(ClusterClientError):
     def __init__(self, *, path: Path, reason: str) -> None:
-        super().__init__(f"cannot load the ignored fields from {path}: {reason}")
+        super().__init__(f"cannot load the field paths from {path}: {reason}")
 
 
 class RequestFailedError(ClusterClientError):

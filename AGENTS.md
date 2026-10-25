@@ -25,7 +25,7 @@ one visible call:
 4. `build_response` (`app/response_builder.py`):
    - empty body (e.g. 204) → returned as is;
    - decode JSON (not JSON → `ResponseRejectedError`, field `$`);
-   - `remove_ignored_fields` (`app/ignored_fields.py`) removes the configured field paths ("function X");
+   - `remove_fields` (`app/field_paths.py`) removes the configured ignored field paths ("function X");
    - `validate_body` (`app/schema.py`) checks the JSON Schema (violation → `ResponseRejectedError` with the
      failing field, e.g. `$.uid`);
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
@@ -43,14 +43,14 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/config/settings.py` | **every** setting (Pydantic Settings, env prefix `CLUSTER_CLIENT_`, nested `__`), `TEXT_ENCODING`, `FrozenModel` |
 | `app/models.py` | `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
-| `app/errors.py` | `ClusterClientError` → `SchemaLoadError`, `IgnoredFieldsLoadError`, `RequestFailedError` → `ClusterUnreachableError`, `ResponseRejectedError` |
+| `app/errors.py` | `ClusterClientError` → `SchemaLoadError`, `FieldPathsLoadError`, `RequestFailedError` → `ClusterUnreachableError`, `ResponseRejectedError` |
 | `app/routes/__init__.py` | creates `cluster_router` and `health_router`; route files import them |
 | `app/routes/cluster_routes.py` | `POST /` orchestrator |
 | `app/routes/read_request.py` | `read_body` (async, see below) and `read_cluster_request` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
 | `app/cluster_client.py` | `send_to_cluster`, `outgoing_headers`, `returned_headers` |
 | `app/response_builder.py` | `build_response`, `decode_body`, `encode_body` |
-| `app/ignored_fields.py` | `load_ignored_fields`, `parse_field_path`, `remove_ignored_fields`, `remove_field` |
+| `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `read_schema_file`, `validate_body` |
 | `app/failures.py` | `failure_code`, `record_failure`, `failure_record`, `failure_response` |
 | `app/logger/setup.py` | handlers (terminal / file / failure file), JSON + line formatters, `configure_logging` |

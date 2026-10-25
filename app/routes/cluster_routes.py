@@ -7,7 +7,7 @@ from app.cluster_client import send_to_cluster
 from app.config import Settings
 from app.errors import RequestFailedError
 from app.failures import failure_response, record_failure
-from app.ignored_fields import FieldPath
+from app.field_paths import FieldPath
 from app.logger import log_debug, log_info
 from app.models import ClusterRequest, ClusterResponse
 from app.response_builder import build_response

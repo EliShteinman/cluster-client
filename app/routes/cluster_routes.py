@@ -37,7 +37,9 @@ def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(depende
         record_failure(
             request=cluster_request, failure=failure, cluster_response=cluster_response, settings=settings
         )
-        cluster_response = failure_response(failure=failure, settings=settings)
+        cluster_response = failure_response(
+            failure=failure, cluster_response=cluster_response, settings=settings
+        )
     return Response(
         content=cluster_response.content,
         status_code=cluster_response.status_code,

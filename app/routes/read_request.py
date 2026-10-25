@@ -24,6 +24,7 @@ def read_cluster_request(*, headers: dict[str, str], body: bytes, settings: Sett
         )
     except ValidationError as error:
         raise HTTPException(
-            status_code=settings.failures.invalid_request_status_code,
+            status_code=settings.failures.invalid_request.status_code,
             detail=error.errors(include_url=False, include_input=False),
+            headers={settings.failures.error_header: settings.failures.invalid_request.error_code},
         ) from error

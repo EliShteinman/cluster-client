@@ -41,15 +41,17 @@ The request body, if any, is sent to the cluster as is. An incoming `traceparent
 cluster and returned in the response. The headers in `CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS`
 (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent on to the cluster as they are.
 
-| Case | Status | Body |
-|---|---|---|
-| Answer matches the schema | the cluster's | the cluster's, unchanged (with its headers) |
-| Answer is not JSON or breaks the schema | 502 | `{"error": "response_rejected", "reason", "field"}` |
-| Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `{"error": "connection_failed", "reason"}` |
-| Request sent, no full answer (read timeout, connection cut) | 504 | `{"error": "timeout", "reason"}` |
-| A required header is missing or invalid | 400 | the validation errors |
+| Case | Status | `x-edge-error` | Body |
+|---|---|---|---|
+| Answer matches the schema | the cluster's | none | the cluster's, unchanged (with its headers) |
+| Answer is not JSON or breaks the schema | 502 | `response_rejected` | `{"error", "reason", "field"}` |
+| Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `connection_failed` | `{"error", "reason"}` |
+| Request sent, no full answer (read timeout, connection cut) | 504 | `timeout` | `{"error", "reason"}` |
+| A required header is missing or invalid | 400 | `invalid_request` | the validation errors |
 
-Status codes and error codes are set by `CLUSTER_CLIENT_FAILURES__*`.
+`x-edge-error` is on every answer the cluster client made itself, and never on a cluster answer. A
+`response_rejected` answer also carries the cluster's status in `x-edge-cluster-status`. Status codes, error
+codes and header names are set by `CLUSTER_CLIENT_FAILURES__*`.
 
 Two files are read at startup; replace them without touching the code or the image:
 

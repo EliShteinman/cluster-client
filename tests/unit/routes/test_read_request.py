@@ -1,14 +1,14 @@
 import pytest
 from fastapi import HTTPException
 
-from app.config import FailureSettings, ForwardingSettings, Settings
+from app.config import FailureCode, FailureSettings, ForwardingSettings, Settings
 from app.models import ClusterRequest, HttpMethod
 from app.routes.read_request import read_cluster_request
 from tests.support.requests import CLUSTER_HEADERS, CLUSTER_URL
 
 SETTINGS: Settings = Settings(
     _env_file=None,
-    failures=FailureSettings(invalid_request_status_code=422),
+    failures=FailureSettings(invalid_request=FailureCode(status_code=422, error_code="bad_request")),
     forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"x-task-id"})),
 )
 
@@ -35,6 +35,13 @@ def test_missing_header_is_refused_with_the_configured_status(missing: str) -> N
         read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
 
     assert raised.value.status_code == 422
+
+
+def test_invalid_request_is_marked_as_a_client_error() -> None:
+    with pytest.raises(HTTPException) as raised:
+        read_cluster_request(headers={}, body=b"", settings=SETTINGS)
+
+    assert raised.value.headers == {"x-edge-error": "bad_request"}
 
 
 def test_configured_headers_are_passed_through() -> None:

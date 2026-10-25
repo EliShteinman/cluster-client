@@ -75,12 +75,14 @@ class FailureCode(FrozenModel):
 
 
 class FailureSettings(FrozenModel):
-    invalid_request_status_code: ErrorStatusCode = Field(default=400)
+    invalid_request: FailureCode = Field(default=FailureCode(status_code=400, error_code="invalid_request"))
     rejected: FailureCode = Field(default=FailureCode(status_code=502, error_code="response_rejected"))
     connection_failed: FailureCode = Field(
         default=FailureCode(status_code=502, error_code="connection_failed")
     )
     no_response: FailureCode = Field(default=FailureCode(status_code=504, error_code="timeout"))
+    error_header: HeaderName = Field(default="x-edge-error")
+    cluster_status_header: HeaderName = Field(default="x-edge-cluster-status")
     content_type: str = Field(default="application/json")
 
 

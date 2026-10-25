@@ -19,8 +19,8 @@ one visible call:
 
 1. `TraceMiddleware` (`app/logger/tracing.py`) continues the manager's `traceparent` (or starts a trace).
 2. `read_cluster_request` (`app/routes/read_request.py`) turns the incoming headers + body into a
-   `ClusterRequest`, including the configured pass-through headers. Missing/invalid header → HTTP 400 (status
-   from config). Nothing is sent to the cluster.
+   `ClusterRequest`, including the configured pass-through headers. Missing/invalid header → HTTP 400 with
+   `x-edge-error: invalid_request` (from config). Nothing is sent to the cluster.
 3. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`. Any `RequestException` →
    `ConnectionFailedError` when the request surely did not leave (`requests` wraps it in `MaxRetryError`:
    refused, DNS, connect timeout), else `NoResponseError` (read timeout, connection cut after sending).
@@ -32,7 +32,8 @@ one visible call:
      failing field, e.g. `$.uid`);
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
 5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file, then
-   `failure_response` builds the 502 answer (`app/failures.py`).
+   `failure_response` builds the answer with `x-edge-error`, and on a rejection `x-edge-cluster-status`
+   (`app/failures.py`).
 6. The route returns status + headers + body; the middleware adds `traceparent`.
 
 Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/diagrams/class-diagram.drawio`.

@@ -62,6 +62,24 @@ def test_unreachable_cluster_is_reported(client: TestClient, fake_cluster: FakeC
     assert send(client=client).json()["error"] == "connection_failed"
 
 
+def test_failure_made_by_the_client_is_marked(client: TestClient, fake_cluster: FakeClusterApi) -> None:
+    fake_cluster.go_offline()
+
+    assert send(client=client).headers["x-edge-error"] == "connection_failed"
+
+
+def test_cluster_answer_is_never_marked(client: TestClient, fake_cluster: FakeClusterApi) -> None:
+    fake_cluster.respond_with_json(status_code=409, body={"uid": 1})
+
+    assert "x-edge-error" not in send(client=client).headers
+
+
+def test_rejection_carries_the_cluster_status(client: TestClient, fake_cluster: FakeClusterApi) -> None:
+    fake_cluster.respond_with_json(status_code=201, body={"uid": "one"})
+
+    assert send(client=client).headers["x-edge-cluster-status"] == "201"
+
+
 def test_configured_headers_reach_the_cluster(client: TestClient, fake_cluster: FakeClusterApi) -> None:
     send(client=client, headers={**CLUSTER_HEADERS, "cluster-state-id": "155"})
 
@@ -100,6 +118,12 @@ def test_invalid_request_is_refused_before_the_cluster(
     response: Response = send(client=client, headers={"x-cluster-method": "GET"})
 
     assert (response.status_code, fake_cluster.requests) == (400, [])
+
+
+def test_invalid_request_is_marked(client: TestClient) -> None:
+    response: Response = send(client=client, headers={"x-cluster-method": "GET"})
+
+    assert response.headers["x-edge-error"] == "invalid_request"
 
 
 def test_trace_reaches_the_cluster(client: TestClient, fake_cluster: FakeClusterApi) -> None:

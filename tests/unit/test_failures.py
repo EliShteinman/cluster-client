@@ -71,11 +71,11 @@ def test_response_uses_the_configured_status_code() -> None:
         _env_file=None, failures=FailureSettings(rejected={"status_code": 422, "error_code": "bad"})
     )
 
-    assert failure_response(failure=REJECTION, settings=settings).status_code == 422
+    assert failure_response(failure=REJECTION, cluster_response=None, settings=settings).status_code == 422
 
 
 def test_response_body_describes_the_failure() -> None:
-    response: ClusterResponse = failure_response(failure=REJECTION, settings=SETTINGS)
+    response: ClusterResponse = failure_response(failure=REJECTION, cluster_response=None, settings=SETTINGS)
 
     assert json.loads(s=response.content) == {
         "error": "response_rejected",
@@ -85,10 +85,40 @@ def test_response_body_describes_the_failure() -> None:
 
 
 def test_response_body_omits_a_missing_field() -> None:
-    assert "field" not in json.loads(s=failure_response(failure=CONNECTION_FAILED, settings=SETTINGS).content)
+    response: ClusterResponse = failure_response(
+        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
+    )
+
+    assert "field" not in json.loads(s=response.content)
 
 
 def test_response_has_the_configured_content_type() -> None:
-    assert failure_response(failure=CONNECTION_FAILED, settings=SETTINGS).headers == {
-        "content-type": "application/json"
-    }
+    response: ClusterResponse = failure_response(
+        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
+    )
+
+    assert response.headers["content-type"] == "application/json"
+
+
+def test_response_is_marked_with_the_error_code() -> None:
+    response: ClusterResponse = failure_response(
+        failure=NO_RESPONSE, cluster_response=None, settings=SETTINGS
+    )
+
+    assert response.headers["x-edge-error"] == "timeout"
+
+
+def test_rejection_carries_the_cluster_status() -> None:
+    response: ClusterResponse = failure_response(
+        failure=REJECTION, cluster_response=ClusterResponse(status_code=201), settings=SETTINGS
+    )
+
+    assert response.headers["x-edge-cluster-status"] == "201"
+
+
+def test_no_cluster_status_without_a_cluster_response() -> None:
+    response: ClusterResponse = failure_response(
+        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
+    )
+
+    assert "x-edge-cluster-status" not in response.headers

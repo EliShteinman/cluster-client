@@ -84,10 +84,10 @@ def test_closed_port_is_a_connection_failure(client_url: str) -> None:
         client_url=client_url, cluster_url=f"http://127.0.0.1:{free_port()}", path="/v1/bdbs/1"
     )
 
-    assert response.json()["error"] == "connection_failed"
+    assert response.headers["x-edge-error"] == "connection_failed"
 
 
 def test_slow_cluster_is_a_timeout(client_url: str, cluster_url: str) -> None:
     response: requests.Response = send(client_url=client_url, cluster_url=cluster_url, path="/slow")
 
-    assert response.json()["error"] == "timeout"
+    assert response.headers["x-edge-error"] == "timeout"

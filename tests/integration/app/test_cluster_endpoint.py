@@ -62,6 +62,12 @@ def test_unreachable_cluster_is_reported(client: TestClient, fake_cluster: FakeC
     assert send(client=client).json()["error"] == "cluster_unreachable"
 
 
+def test_configured_headers_reach_the_cluster(client: TestClient, fake_cluster: FakeClusterApi) -> None:
+    send(client=client, headers={**CLUSTER_HEADERS, "cluster-state-id": "155"})
+
+    assert fake_cluster.requests[0].headers["cluster-state-id"] == "155"
+
+
 def test_rejection_is_written_to_the_failure_file(
     client: TestClient, fake_cluster: FakeClusterApi, failure_lines: JsonLines
 ) -> None:

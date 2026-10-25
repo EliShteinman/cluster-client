@@ -13,8 +13,15 @@ async def read_body(*, request: Request) -> bytes:
 
 @log_debug
 def read_cluster_request(*, headers: dict[str, str], body: bytes, settings: Settings) -> ClusterRequest:
+    passed_through_headers: dict[str, str] = {
+        name: value
+        for name, value in headers.items()
+        if name.lower() in settings.forwarding.passed_through_request_headers
+    }
     try:
-        return ClusterRequest.model_validate(obj={**headers, "body": body})
+        return ClusterRequest.model_validate(
+            obj={**headers, "passed_through_headers": passed_through_headers, "body": body}
+        )
     except ValidationError as error:
         raise HTTPException(
             status_code=settings.failures.invalid_request_status_code,

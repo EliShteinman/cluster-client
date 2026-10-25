@@ -1,12 +1,16 @@
 import pytest
 from fastapi import HTTPException
 
-from app.config import FailureSettings, Settings
+from app.config import FailureSettings, ForwardingSettings, Settings
 from app.models import ClusterRequest, HttpMethod
 from app.routes.read_request import read_cluster_request
 from tests.support.requests import CLUSTER_HEADERS, CLUSTER_URL
 
-SETTINGS: Settings = Settings(_env_file=None, failures=FailureSettings(invalid_request_status_code=422))
+SETTINGS: Settings = Settings(
+    _env_file=None,
+    failures=FailureSettings(invalid_request_status_code=422),
+    forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"x-task-id"})),
+)
 
 
 def test_configured_headers_become_the_cluster_request() -> None:
@@ -31,3 +35,19 @@ def test_missing_header_is_refused_with_the_configured_status(missing: str) -> N
         read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
 
     assert raised.value.status_code == 422
+
+
+def test_configured_headers_are_passed_through() -> None:
+    request: ClusterRequest = read_cluster_request(
+        headers={**CLUSTER_HEADERS, "x-task-id": "t1"}, body=b"", settings=SETTINGS
+    )
+
+    assert request.passed_through_headers == {"x-task-id": "t1"}
+
+
+def test_other_headers_are_not_passed_through() -> None:
+    request: ClusterRequest = read_cluster_request(
+        headers={**CLUSTER_HEADERS, "x-other": "1"}, body=b"", settings=SETTINGS
+    )
+
+    assert request.passed_through_headers == {}

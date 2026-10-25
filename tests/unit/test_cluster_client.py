@@ -59,6 +59,24 @@ def test_traceparent_continues_the_active_trace() -> None:
     assert sent.trace_id == TRACE.trace_id
 
 
+def test_passed_through_headers_are_sent() -> None:
+    request: ClusterRequest = CLUSTER_REQUEST.model_copy(
+        update={"passed_through_headers": {"x-task-id": "t1"}}
+    )
+
+    assert outgoing_headers(request=request, settings=FORWARDING, tracing=TRACING)["x-task-id"] == "t1"
+
+
+def test_passed_through_header_cannot_replace_the_authorization() -> None:
+    request: ClusterRequest = CLUSTER_REQUEST.model_copy(
+        update={"passed_through_headers": {"authorization": "Basic other"}}
+    )
+
+    assert outgoing_headers(request=request, settings=FORWARDING, tracing=TRACING)["authorization"] == (
+        "Basic abc"
+    )
+
+
 def test_recomputed_headers_are_not_returned() -> None:
     response: requests.Response = requests.Response()
     response.headers = CaseInsensitiveDict(data={"Content-Length": "2", "x-cluster": "1"})

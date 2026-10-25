@@ -41,7 +41,7 @@ def outgoing_headers(
     headers[settings.authorization_header] = request.authorization.get_secret_value()
     if request.content_type is not None:
         headers[settings.content_type_header] = request.content_type
-    return headers
+    return {**request.passed_through_headers, **headers}
 
 
 @log_debug

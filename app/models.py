@@ -25,6 +25,7 @@ class ClusterRequest(FrozenModel):
     url: HttpUrl = Field(validation_alias=HEADER_NAMES.url.lower())
     authorization: SecretStr = Field(min_length=1, validation_alias=HEADER_NAMES.authorization.lower())
     content_type: str | None = Field(default=None, validation_alias=HEADER_NAMES.content_type.lower())
+    passed_through_headers: dict[str, str] = Field(default_factory=dict)
     body: bytes = Field(default=b"")
 
 

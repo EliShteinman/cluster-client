@@ -19,7 +19,8 @@ one visible call:
 
 1. `TraceMiddleware` (`app/logger/tracing.py`) continues the manager's `traceparent` (or starts a trace).
 2. `read_cluster_request` (`app/routes/read_request.py`) turns the incoming headers + body into a
-   `ClusterRequest`. Missing/invalid header → HTTP 400 (status from config). Nothing is sent to the cluster.
+   `ClusterRequest`, including the configured pass-through headers. Missing/invalid header → HTTP 400 (status
+   from config). Nothing is sent to the cluster.
 3. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`. Connection error or timeout →
    `ClusterUnreachableError`.
 4. `build_response` (`app/response_builder.py`):
@@ -92,6 +93,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   (`$[*].shards_placement`). Indexes like `[0]` and paths ending in `[*]` are rejected at startup.
 - **Failure file** (`logs/failures.log`, logger `cluster_client.failures`): one JSON line per failed request,
   including the full cluster response. Find it by the `trace_id` the manager got back in `traceparent`.
+- **Pass-through headers** (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent as they are; the
+  client's own authorization, content-type and traceparent always win over them.
 - The error `reason` from `requests` is long; the owner chose to keep it as is.
 
 ## Tests

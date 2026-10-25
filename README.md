@@ -38,7 +38,8 @@ curl -X POST http://127.0.0.1:8000/ \
 ```
 
 The request body, if any, is sent to the cluster as is. An incoming `traceparent` is continued to the
-cluster and returned in the response.
+cluster and returned in the response. The headers in `CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS`
+(`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent on to the cluster as they are.
 
 | Case | Status | Body |
 |---|---|---|

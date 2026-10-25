@@ -1,0 +1,8 @@
+{
+  "body": {
+    "action_uid": "75cbdc09-6d76-46d0-8495-8112eb143165"
+  },
+  "method": "DELETE",
+  "path": "/v1/users/5",
+  "status": 200
+}

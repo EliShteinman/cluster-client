@@ -1,0 +1,15 @@
+{
+  "body": {
+    "configuration_version": 1,
+    "crdb_guid": "e6a13094-bebc-4746-93d1-9c71d53a8134",
+    "ended": "2026-10-25T14:03:18.380175Z",
+    "id": "cf052a62-b63c-400c-8ec4-a1dfd4fde0ed",
+    "operation": "create_crdb",
+    "started": "2026-10-25T14:03:09.325713Z",
+    "status": "finished",
+    "worker_name": "crdb_worker:1:1"
+  },
+  "method": "GET",
+  "path": "/v1/crdb_tasks/cf052a62-b63c-400c-8ec4-a1dfd4fde0ed",
+  "status": 200
+}

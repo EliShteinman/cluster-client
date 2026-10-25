@@ -1,0 +1,8 @@
+{
+  "body": {
+    "action_uid": "8220fff2-8b4a-49c3-8754-0f9fa094d544"
+  },
+  "method": "DELETE",
+  "path": "/v1/roles/3",
+  "status": 200
+}

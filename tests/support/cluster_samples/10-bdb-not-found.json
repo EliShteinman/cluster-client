@@ -1,0 +1,9 @@
+{
+  "body": {
+    "description": "Db does not exist",
+    "error_code": "db_not_exist"
+  },
+  "method": "GET",
+  "path": "/v1/bdbs/9999",
+  "status": 404
+}

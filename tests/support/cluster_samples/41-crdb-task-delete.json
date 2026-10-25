@@ -1,0 +1,15 @@
+{
+  "body": {
+    "configuration_version": 3,
+    "crdb_guid": "e6a13094-bebc-4746-93d1-9c71d53a8134",
+    "ended": "2026-10-25T14:03:34.778938Z",
+    "id": "8582c6f9-af11-4465-92ac-cb4c7a363083",
+    "operation": "delete_crdb",
+    "started": "2026-10-25T14:03:27.752474Z",
+    "status": "finished",
+    "worker_name": "crdb_worker:1:1"
+  },
+  "method": "GET",
+  "path": "/v1/crdb_tasks/8582c6f9-af11-4465-92ac-cb4c7a363083",
+  "status": 200
+}

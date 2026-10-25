@@ -1,0 +1,12 @@
+{
+  "body": {
+    "action_uid": "51feb22f-4f26-4ec9-bd33-df0845570cff",
+    "creation_time": "1792937200",
+    "name": "update_redis_acls",
+    "status": "queued",
+    "task_id": "51feb22f-4f26-4ec9-bd33-df0845570cff"
+  },
+  "method": "GET",
+  "path": "/v1/actions/51feb22f-4f26-4ec9-bd33-df0845570cff",
+  "status": 200
+}

@@ -1,0 +1,20 @@
+{
+  "body": {
+    "action_uid": "67a120e0-bbd8-428e-8059-0ca80a359536",
+    "auth_method": "regular",
+    "email": "",
+    "email_alerts": true,
+    "last_login": 0,
+    "name": "probe-app",
+    "password_issue_date": "2026-10-25T14:02:58Z",
+    "role": "db_member",
+    "role_uids": [
+      3
+    ],
+    "status": "active",
+    "uid": 5
+  },
+  "method": "PUT",
+  "path": "/v1/users/5",
+  "status": 200
+}

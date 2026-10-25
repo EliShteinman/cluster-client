@@ -69,6 +69,20 @@ Ignored and redacted fields use the same format as `field` in a rejection, with 
 
 When a field is removed, the answer is re-encoded; otherwise it is returned byte for byte.
 
+### Example configuration
+
+`config/examples/` holds a schema and ignored fields for every Redis Enterprise answer the manager uses (bdb,
+redis_acl, role, user, crdb, crdb task, action, cluster, stats, errors). The schema forbids passwords and
+certificates; the ignored fields remove them first, so the answer passes without them. Run it:
+
+```bash
+CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH=config/examples/response-schema.json \
+CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH=config/examples/ignored-fields.json python docker/entrypoint.py
+```
+
+`tests/integration/config/test_examples.py` runs real cluster answers (`tests/support/cluster_samples/`,
+passwords replaced) through it.
+
 Health probes: `GET /health/live`, `GET /health/ready`.
 
 ## Logging

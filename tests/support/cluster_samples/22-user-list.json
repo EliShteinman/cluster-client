@@ -1,0 +1,35 @@
+{
+  "body": [
+    {
+      "auth_method": "regular",
+      "email": "admin@redis.local",
+      "email_alerts": true,
+      "last_login": 1792936978,
+      "name": "Administrator",
+      "password_issue_date": "2026-10-25T09:07:58Z",
+      "role": "admin",
+      "role_uids": [
+        1
+      ],
+      "status": "active",
+      "uid": 1
+    },
+    {
+      "auth_method": "regular",
+      "email": "",
+      "email_alerts": true,
+      "last_login": 0,
+      "name": "probe-app",
+      "password_issue_date": "2026-10-25T14:02:58Z",
+      "role": "db_member",
+      "role_uids": [
+        3
+      ],
+      "status": "active",
+      "uid": 5
+    }
+  ],
+  "method": "GET",
+  "path": "/v1/users",
+  "status": 200
+}

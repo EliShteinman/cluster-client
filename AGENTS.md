@@ -61,6 +61,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/logger/tracing.py` | W3C traceparent parse/format, context var, log filter, `TraceMiddleware` |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
 | `config/response-schema.json`, `config/ignored-fields.json`, `config/redacted-fields.json` | the three runtime files (never baked into the image) |
+| `config/examples/` | example schema + ignored fields for every answer the manager uses; tested against `tests/support/cluster_samples/` (real answers, passwords replaced) |
 
 ## Mandatory coding rules (the owner enforces these strictly)
 

@@ -33,7 +33,7 @@ one visible call:
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
 5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file (redacted
    fields left out of the cluster response), then `failure_response` builds the answer with `x-edge-error`,
-   and on a rejection `x-edge-cluster-status` (`app/failures.py`).
+   and on a rejection `x-edge-cluster-status` (`app/failures/`).
 6. The route returns status + headers + body; the middleware adds `traceparent`.
 
 Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/diagrams/class-diagram.drawio`.
@@ -44,10 +44,10 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 |---|---|
 | `app/main.py` | `create_app(settings)` (factory) and `lifespan` (startup: configure logging, load schema, ignored and redacted fields into `app.state`) |
 | `app/server.py` | `serve()` → `uvicorn.run` |
-| `app/config/settings.py` | **every** setting (Pydantic Settings, env prefix `CLUSTER_CLIENT_`, nested `__`), `TEXT_ENCODING`, `FrozenModel` |
+| `app/config/` | **every** setting, one file per section: `base.py` (`FrozenModel`, `EnvironmentSettings`, `TEXT_ENCODING`, field types), `server.py`, `headers.py`, `forwarding.py`, `validation.py` (schema, ignored and redacted field files), `failures.py`, `logging.py` (`HandlerSettings` → console / file → failure file), `tracing.py`, `settings.py` (root `Settings`, env prefix `CLUSTER_CLIENT_`, nested `__`). `__init__` re-exports them |
 | `app/models.py` | `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
-| `app/errors.py` | `ClusterClientError` → `SchemaLoadError`, `FieldPathsLoadError`, `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
-| `app/routes/__init__.py` | creates `cluster_router` and `health_router`; route files import them |
+| `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
+| `app/routes/__init__.py` | collects `cluster_router` and `health_router`; each route file defines its own |
 | `app/routes/cluster_routes.py` | `POST /` orchestrator |
 | `app/routes/read_request.py` | `read_body` (async, see below) and `read_cluster_request` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
@@ -55,12 +55,15 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/response_builder.py` | `build_response`, `decode_body`, `encode_body` |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `read_schema_file`, `validate_body` |
-| `app/failures.py` | `failure_code`, `record_failure`, `failure_record`, `redacted_content`, `failure_response` |
-| `app/logger/setup.py` | handlers (terminal / file / failure file), JSON + line formatters, `configure_logging` |
+| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`) |
+| `app/logger/formatters.py` | JSON + line formatters |
+| `app/logger/handlers.py` | terminal / file handlers |
+| `app/logger/setup.py` | `configure_logging`, `reset_logging` |
 | `app/logger/decorators.py` | `log_debug`, `log_info` |
 | `app/logger/tracing.py` | W3C traceparent parse/format, context var, log filter, `TraceMiddleware` |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
 | `config/response-schema.json`, `config/ignored-fields.json`, `config/redacted-fields.json` | the three runtime files (never baked into the image) |
+| `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap. `values.schema.json` restricts every value; generated keys are the env vars, minus those the image owns (host, port) |
 | `config/examples/` | example schema + ignored fields for every answer the manager uses; tested against `tests/support/cluster_samples/` (real answers, passwords replaced) |
 
 ## Mandatory coding rules (the owner enforces these strictly)
@@ -77,7 +80,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 5. **Config is the single source** of every name the code expects (header names, status codes, error codes, paths,
    logger names). No string constants in code for these. Route paths in decorators are allowed.
 6. **Simplicity over patterns.** Functions, not classes, unless a library requires a class. No speculative
-   extension points, no protocols/interfaces with one implementation, no extra layers. Few files per concept.
+   extension points, no protocols/interfaces with one implementation, no extra layers. One small file per
+   concept; inherit where models share fields.
 7. Ruff must pass (`ruff check . && ruff format .`), line length 110.
 
 ## Decisions that look odd but are deliberate
@@ -95,7 +99,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - **Ignored field paths** use the same format as the `field` of a rejection: `$.a.b`, `[*]` for every list item
   (`$[*].shards_placement`). Indexes like `[0]` and paths ending in `[*]` are rejected at startup.
 - **Failure file** (`logs/failures.log`, logger `cluster_client.failures`): one JSON line per failed request,
-  including the cluster response without the redacted fields (`config/redacted-fields.json`: the passwords
+  including the cluster response without the redacted fields (`validation.redacted_fields_path`: the passwords
   Redis returns in bdb and crdb answers). DEBUG logs everything, on purpose.
 - **Pass-through headers** (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent as they are; the
   client's own authorization, content-type and traceparent always win over them. Find it by the `trace_id` the manager got back in `traceparent`.
@@ -118,6 +122,10 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - Keep answers short; the owner writes in Hebrew.
 
 ## Open items (do not implement without the owner)
+
+- **Must be rewritten next:** tracing (`app/logger/tracing.py`, `TraceMiddleware`, `TraceContextFilter`) is
+  hand-written. Replace it with OpenTelemetry (W3C `traceparent` propagation, FastAPI and `requests`
+  instrumentation, OTLP exporter). Do not extend the hand-written version.
 
 - `/health/ready` should check something real.
 - Whether cluster-client should hold a list of known clusters/credentials: `docs/proposals/cluster-health-check.md`.

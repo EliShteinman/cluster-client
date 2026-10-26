@@ -26,6 +26,11 @@ async def ship(*, order: Order) -> None:
     raise LookupError(order.city)
 
 
+@log_info(inputs=("priority",))
+def queue(*, order: Order, priority: int = 3) -> int:
+    return order.id + priority
+
+
 ORDER: Order = Order(id=7, city="Haifa")
 
 
@@ -73,3 +78,9 @@ def test_records_are_info(caplog: pytest.LogCaptureFixture) -> None:
     charge(order=ORDER, card="4111")
 
     assert records_of(caplog=caplog)[0].levelno == logging.INFO
+
+
+def test_defaulted_input_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    queue(order=ORDER)
+
+    assert records_of(caplog=caplog)[0].inputs == {"priority": 3}

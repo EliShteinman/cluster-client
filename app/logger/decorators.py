@@ -91,8 +91,9 @@ def wrap_call[**P, R](
     signature: inspect.Signature = inspect.signature(obj=function)
 
     def arguments_of(*args: object, **kwargs: object) -> dict[str, object]:
-        bound: dict[str, object] = signature.bind(*args, **kwargs).arguments
-        return {name: value for name, value in bound.items() if name != SELF_PARAMETER}
+        bound: inspect.BoundArguments = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        return {name: value for name, value in bound.arguments.items() if name != SELF_PARAMETER}
 
     if inspect.iscoroutinefunction(obj=function):
         coroutine_function: Callable[P, Awaitable[object]] = cast(Callable[P, Awaitable[object]], function)

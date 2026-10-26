@@ -113,7 +113,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 ## Working with the owner
 
 - A question ("why…?", "what is…?") is **not** a request to change code. Answer, propose, wait for "yes".
-- **Never commit** unless explicitly asked. Conventional Commits; branch `feature/app-scaffolding`.
+- **Never commit** unless explicitly asked. Conventional Commits; single branch `main`.
 - Do not redraw diagrams unless asked; if code changes make them stale, say so.
 - Keep answers short; the owner writes in Hebrew.
 

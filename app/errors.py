@@ -1,18 +1,24 @@
 from pathlib import Path
+from typing import ClassVar
 
 
 class ClusterClientError(Exception):
     pass
 
 
-class SchemaLoadError(ClusterClientError):
+class ConfigFileLoadError(ClusterClientError):
+    content: ClassVar[str]
+
     def __init__(self, *, path: Path, reason: str) -> None:
-        super().__init__(f"cannot load the response schema from {path}: {reason}")
+        super().__init__(f"cannot load {self.content} from {path}: {reason}")
 
 
-class FieldPathsLoadError(ClusterClientError):
-    def __init__(self, *, path: Path, reason: str) -> None:
-        super().__init__(f"cannot load the field paths from {path}: {reason}")
+class SchemaLoadError(ConfigFileLoadError):
+    content: ClassVar[str] = "the response schema"
+
+
+class FieldPathsLoadError(ConfigFileLoadError):
+    content: ClassVar[str] = "the field paths"
 
 
 class RequestFailedError(ClusterClientError):

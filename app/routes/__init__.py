@@ -1,8 +1,4 @@
-from fastapi import APIRouter
-
-cluster_router: APIRouter = APIRouter()
-health_router: APIRouter = APIRouter(prefix="/health")
-
-from app.routes import cluster_routes, health_routes  # noqa: E402, F401 - registers the routes on the routers above
+from app.routes.cluster_routes import cluster_router
+from app.routes.health_routes import health_router
 
 __all__: list[str] = ["cluster_router", "health_router"]

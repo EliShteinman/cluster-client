@@ -1,6 +1,9 @@
+from fastapi import APIRouter
+
 from app.logger import log_debug
 from app.models import HealthStatus
-from app.routes import health_router
+
+health_router: APIRouter = APIRouter(prefix="/health")
 
 
 @health_router.get(path="/live")

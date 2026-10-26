@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from jsonschema import Draft202012Validator
 
 from app.cluster_client import send_to_cluster
@@ -11,8 +11,9 @@ from app.field_paths import FieldPath
 from app.logger import log_debug, log_info
 from app.models import ClusterRequest, ClusterResponse
 from app.response_builder import build_response
-from app.routes import cluster_router
 from app.routes.read_request import read_body, read_cluster_request
+
+cluster_router: APIRouter = APIRouter()
 
 
 @cluster_router.post(path="/")

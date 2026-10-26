@@ -59,7 +59,7 @@ Three files are read at startup; replace them without touching the code or the i
 |---|---|---|
 | `config/response-schema.json` | `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | the JSON Schema every answer must match |
 | `config/ignored-fields.json` | `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | field paths removed before the check |
-| `config/redacted-fields.json` | `CLUSTER_CLIENT_LOG__FAILURE_FILE__REDACTED_FIELDS_PATH` | field paths left out of the failure log (passwords) |
+| `config/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log (passwords) |
 
 Ignored and redacted fields use the same format as `field` in a rejection, with `[*]` for every item of a list:
 

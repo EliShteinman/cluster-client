@@ -158,12 +158,11 @@ def test_missing_redacted_fields_file_stops_startup(
 ) -> None:
     settings: Settings = Settings(
         _env_file=None,
-        validation=ValidationSettings(schema_path=schema_path),
+        validation=ValidationSettings(
+            schema_path=schema_path, redacted_fields_path=tmp_path / "missing.json"
+        ),
         log=LoggingSettings(
-            console=ConsoleSettings(enabled=False),
-            failure_file=FailureFileSettings(
-                path=failure_log_path, redacted_fields_path=tmp_path / "missing.json"
-            ),
+            console=ConsoleSettings(enabled=False), failure_file=FailureFileSettings(path=failure_log_path)
         ),
     )
 

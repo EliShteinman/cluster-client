@@ -17,7 +17,7 @@ def create_app(*, settings: Settings) -> FastAPI:
         title=settings.application.title, version=settings.application.version, lifespan=lifespan
     )
     app.state.settings = settings
-    app.add_middleware(TraceMiddleware, settings=settings.log.tracing)
+    app.add_middleware(TraceMiddleware, settings=settings.tracing)
     app.include_router(router=health_router)
     app.include_router(router=cluster_router)
     return app
@@ -29,6 +29,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings=settings.log)
     app.state.schema = load_schema(path=settings.validation.schema_path)
     app.state.ignored_fields = load_field_paths(path=settings.validation.ignored_fields_path)
-    app.state.redacted_fields = load_field_paths(path=settings.log.failure_file.redacted_fields_path)
+    app.state.redacted_fields = load_field_paths(path=settings.validation.redacted_fields_path)
     yield
     reset_logging()

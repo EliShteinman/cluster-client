@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "cluster-client values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "replicaCount",
+    "image",
+    "containerPort",
+    "service",
+    "route",
+    "mounts",
+    "logsSizeLimit",
+    "config",
+    "secret",
+    "files",
+    "resources"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag",
+        "pullPolicy"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+([._/:-][a-z0-9]+)*$"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "containerPort": {
+      "$ref": "#/$defs/port"
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "tls"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "pattern": "^(([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "termination",
+            "insecureEdgeTerminationPolicy"
+          ],
+          "properties": {
+            "termination": {
+              "type": "string",
+              "enum": [
+                "edge",
+                "passthrough",
+                "reencrypt"
+              ]
+            },
+            "insecureEdgeTerminationPolicy": {
+              "type": "string",
+              "enum": [
+                "None",
+                "Allow",
+                "Redirect"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "logs"
+      ],
+      "properties": {
+        "files": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "logs": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "logsSizeLimit": {
+      "$ref": "#/$defs/quantity"
+    },
+    "config": {
+      "$ref": "#/$defs/environment"
+    },
+    "secret": {
+      "$ref": "#/$defs/environment"
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "response-schema.json",
+        "ignored-fields.json",
+        "redacted-fields.json"
+      ],
+      "properties": {
+        "response-schema.json": {
+          "type": "object",
+          "required": [
+            "$schema"
+          ]
+        },
+        "ignored-fields.json": {
+          "$ref": "#/$defs/fieldPaths"
+        },
+        "redacted-fields.json": {
+          "$ref": "#/$defs/fieldPaths"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "boolean": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false"
+      ]
+    },
+    "logLevel": {
+      "type": "string",
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG"
+      ]
+    },
+    "logFormat": {
+      "type": "string",
+      "enum": [
+        "line",
+        "json"
+      ]
+    },
+    "headerName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"
+    },
+    "headerNames": {
+      "type": "string",
+      "pattern": "^\\[\\s*(\"[A-Za-z0-9!#$%&'*+.^_`|~-]+\"\\s*(,\\s*\"[A-Za-z0-9!#$%&'*+.^_`|~-]+\"\\s*)*)?\\]$"
+    },
+    "errorStatusCode": {
+      "type": "string",
+      "pattern": "^[45][0-9]{2}$"
+    },
+    "errorCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z_]*$"
+    },
+    "mediaType": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+$"
+    },
+    "positiveNumber": {
+      "type": "string",
+      "pattern": "^(0\\.[0-9]*[1-9][0-9]*|[1-9][0-9]*(\\.[0-9]+)?)$"
+    },
+    "positiveInteger": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "nonNegativeInteger": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "absolutePath": {
+      "type": "string",
+      "pattern": "^/[^\\s]*$"
+    },
+    "loggerName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fieldPath": {
+      "type": "string",
+      "pattern": "^\\$(\\.[^.\\[\\]]+|\\[\\*\\])*\\.[^.\\[\\]]+$"
+    },
+    "fieldPaths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/fieldPath"
+      }
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|Ki|Mi|Gi)?$"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "CLUSTER_CLIENT_SERVER__SERVER_HEADER": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_SERVER__DATE_HEADER": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_APPLICATION__TITLE": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_HEADERS__METHOD": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_HEADERS__URL": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_HEADERS__AUTHORIZATION": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_HEADERS__CONTENT_TYPE": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "CLUSTER_CLIENT_FORWARDING__TIMEOUT_SECONDS": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "CLUSTER_CLIENT_FORWARDING__AUTHORIZATION_HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_FORWARDING__CONTENT_TYPE_HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS": {
+          "$ref": "#/$defs/headerNames"
+        },
+        "CLUSTER_CLIENT_FORWARDING__RECOMPUTED_RESPONSE_HEADERS": {
+          "$ref": "#/$defs/headerNames"
+        },
+        "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__CONNECTION_FAILED__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__REJECTED__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__CONNECTION_FAILED__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__ERROR_HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_FAILURES__CLUSTER_STATUS_HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_FAILURES__CONTENT_TYPE": {
+          "$ref": "#/$defs/mediaType"
+        },
+        "CLUSTER_CLIENT_LOG__LEVEL": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "CLUSTER_CLIENT_LOG__CONSOLE__ENABLED": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_LOG__CONSOLE__LEVEL": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "CLUSTER_CLIENT_LOG__CONSOLE__FORMAT": {
+          "$ref": "#/$defs/logFormat"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__ENABLED": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__LEVEL": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__FORMAT": {
+          "$ref": "#/$defs/logFormat"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__PATH": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__MAX_BYTES": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "CLUSTER_CLIENT_LOG__FILE__BACKUP_COUNT": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__ENABLED": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__LEVEL": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__FORMAT": {
+          "$ref": "#/$defs/logFormat"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__MAX_BYTES": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__BACKUP_COUNT": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "CLUSTER_CLIENT_LOG__FAILURE_FILE__LOGGER_NAME": {
+          "$ref": "#/$defs/loggerName"
+        },
+        "CLUSTER_CLIENT_LOG__FORMATTING__LINE_PATTERN": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_LOG__FORMATTING__DATE_FORMAT": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_TRACING__TRACEPARENT_HEADER": {
+          "$ref": "#/$defs/headerName"
+        }
+      }
+    }
+  }
+}

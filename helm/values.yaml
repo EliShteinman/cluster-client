@@ -5,96 +5,56 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: true
-  name: ""
-  annotations: {}
-
-service:
-  type: ClusterIP
-  port: 80
-
 containerPort: 8000
 
-health:
-  # must match the routes in app/routes/health_routes.py
-  livenessPath: /health/live
-  readinessPath: /health/ready
-  initialDelaySeconds: 3
-  periodSeconds: 10
-  timeoutSeconds: 2
-  failureThreshold: 3
+service:
+  port: 80
 
-# Plain settings, rendered into a ConfigMap. Keys are CLUSTER_CLIENT_* env vars (see .env.example).
+route:
+  host: ""
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+mounts:
+  files: /etc/cluster-client
+  logs: /app/logs
+
+logsSizeLimit: 512Mi
+
 config:
   CLUSTER_CLIENT_LOG__LEVEL: INFO
   CLUSTER_CLIENT_LOG__CONSOLE__FORMAT: json
   CLUSTER_CLIENT_LOG__FILE__ENABLED: "false"
   CLUSTER_CLIENT_LOG__FAILURE_FILE__ENABLED: "true"
 
-# The JSON Schema every Redis response must match. Mounted as a file, read at startup.
-# Replace it without rebuilding the image: --set-file responseSchema=path/to/schema.json
-responseSchema: |
-  {
-    "$schema": "https://json-schema.org/draft/2020-12/schema"
-  }
+secret: {}
 
-# Field paths removed from every response before the schema check (fields that are never needed).
-# Same format as "field" in a rejection, with [*] for every item: ["$[*].shards_placement"]
-# Replace it without rebuilding the image: --set-file ignoredFields=path/to/ignored-fields.json
-ignoredFields: |
-  []
-
-# Field paths left out of the cluster response written to the failure log (passwords). Same format.
-# Replace it without rebuilding the image: --set-file redactedFields=path/to/redacted-fields.json
-redactedFields: |
-  [
-    "$.authentication_admin_pass",
-    "$.authentication_redis_pass",
-    "$.authentication_sasl_pass",
-    "$[*].authentication_admin_pass",
-    "$[*].authentication_redis_pass",
-    "$[*].authentication_sasl_pass",
-    "$.default_db_config.authentication_admin_pass",
-    "$.default_db_config.authentication_redis_pass",
-    "$.default_db_config.authentication_sasl_pass",
-    "$.instances[*].db_config.authentication_admin_pass",
-    "$.instances[*].db_config.authentication_redis_pass",
-    "$.instances[*].db_config.authentication_sasl_pass",
-    "$.instances[*].cluster.credentials.password",
-    "$.crdbs[*].default_db_config.authentication_admin_pass",
-    "$.crdbs[*].default_db_config.authentication_redis_pass",
-    "$.crdbs[*].default_db_config.authentication_sasl_pass",
-    "$.crdbs[*].instances[*].db_config.authentication_admin_pass",
-    "$.crdbs[*].instances[*].db_config.authentication_redis_pass",
-    "$.crdbs[*].instances[*].db_config.authentication_sasl_pass",
-    "$.crdbs[*].instances[*].cluster.credentials.password"
-  ]
-
-# Names of existing Secrets whose keys become env vars (credentials never go in values).
-envFromSecrets: []
-
-logsVolume:
-  mountPath: /app/logs
-  sizeLimit: 512Mi
-
-podAnnotations: {}
-podLabels: {}
-
-podSecurityContext:
-  runAsNonRoot: true
-  seccompProfile:
-    type: RuntimeDefault
-
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  capabilities:
-    drop: ["ALL"]
+files:
+  response-schema.json:
+    $schema: https://json-schema.org/draft/2020-12/schema
+  ignored-fields.json: []
+  redacted-fields.json:
+    - $.authentication_admin_pass
+    - $.authentication_redis_pass
+    - $.authentication_sasl_pass
+    - $[*].authentication_admin_pass
+    - $[*].authentication_redis_pass
+    - $[*].authentication_sasl_pass
+    - $.default_db_config.authentication_admin_pass
+    - $.default_db_config.authentication_redis_pass
+    - $.default_db_config.authentication_sasl_pass
+    - $.instances[*].db_config.authentication_admin_pass
+    - $.instances[*].db_config.authentication_redis_pass
+    - $.instances[*].db_config.authentication_sasl_pass
+    - $.instances[*].cluster.credentials.password
+    - $.crdbs[*].default_db_config.authentication_admin_pass
+    - $.crdbs[*].default_db_config.authentication_redis_pass
+    - $.crdbs[*].default_db_config.authentication_sasl_pass
+    - $.crdbs[*].instances[*].db_config.authentication_admin_pass
+    - $.crdbs[*].instances[*].db_config.authentication_redis_pass
+    - $.crdbs[*].instances[*].db_config.authentication_sasl_pass
+    - $.crdbs[*].instances[*].cluster.credentials.password
 
 resources:
   requests:
@@ -102,7 +62,3 @@ resources:
     memory: 128Mi
   limits:
     memory: 256Mi
-
-nodeSelector: {}
-tolerations: []
-affinity: {}

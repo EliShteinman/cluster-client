@@ -13,80 +13,55 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/validation: {{ include (print $.Template.BasePath "/configmap-validation.yaml") . | sha256sum }}
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        checksum/files: {{ include (print $.Template.BasePath "/configmap-files.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "cluster-client.selectorLabels" . | nindent 8 }}
-        {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "cluster-client.serviceAccountName" . }}
+      automountServiceAccountToken: false
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: {{ .Values.containerPort }}
-              protocol: TCP
           envFrom:
             - configMapRef:
                 name: {{ include "cluster-client.fullname" . }}
-            {{- range .Values.envFromSecrets }}
+            {{- if .Values.secret }}
             - secretRef:
-                name: {{ . }}
+                name: {{ include "cluster-client.fullname" . }}
             {{- end }}
           livenessProbe:
             httpGet:
-              path: {{ .Values.health.livenessPath }}
+              path: /health/live
               port: http
-            initialDelaySeconds: {{ .Values.health.initialDelaySeconds }}
-            periodSeconds: {{ .Values.health.periodSeconds }}
-            timeoutSeconds: {{ .Values.health.timeoutSeconds }}
-            failureThreshold: {{ .Values.health.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.health.readinessPath }}
+              path: /health/ready
               port: http
-            initialDelaySeconds: {{ .Values.health.initialDelaySeconds }}
-            periodSeconds: {{ .Values.health.periodSeconds }}
-            timeoutSeconds: {{ .Values.health.timeoutSeconds }}
-            failureThreshold: {{ .Values.health.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: logs
-              mountPath: {{ .Values.logsVolume.mountPath }}
-            - name: validation
-              mountPath: /etc/cluster-client
+            - name: files
+              mountPath: {{ .Values.mounts.files }}
               readOnly: true
+            - name: logs
+              mountPath: {{ .Values.mounts.logs }}
       volumes:
-        - name: validation
+        - name: files
           configMap:
-            name: {{ include "cluster-client.fullname" . }}-validation
+            name: {{ include "cluster-client.fullname" . }}-files
         - name: logs
           emptyDir:
-            sizeLimit: {{ .Values.logsVolume.sizeLimit }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+            sizeLimit: {{ .Values.logsSizeLimit }}

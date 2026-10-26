@@ -49,7 +49,7 @@ CLUSTER_CLIENT_CLUSTER_HEALTH__CA_BUNDLE_PATH=/etc/cluster-client/ca.pem
 CLUSTER_CLIENT_CLUSTERS=[{"name": "east-1", "url": "https://east-1.internal:9443"}, {"name": "east-2", "url": "https://east-2.internal:9443"}]
 ```
 
-פרטי הגישה ב־Kubernetes Secret, דרך `envFromSecrets` שכבר קיים ב־chart:
+פרטי הגישה ב־Kubernetes Secret, דרך `secret:` שכבר קיים ב־values של ה־chart:
 
 ```env
 CLUSTER_CLIENT_CLUSTER_CREDENTIALS={"east-1": {"username": "...", "password": "..."}, "east-2": {...}}

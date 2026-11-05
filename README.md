@@ -6,9 +6,8 @@ cluster named in the request, checks the answer against a JSON schema, and retur
 ## Installation
 
 ```bash
-uv venv -p 3.14
-uv pip install -e ".[dev]"
-pre-commit install
+uv sync
+uv run pre-commit install
 cp .env.example .env
 ```
 
@@ -23,7 +22,6 @@ The app is built by `app.main.create_app(settings)`. Each environment passes its
 | Environment | Entry | Settings come from |
 |---|---|---|
 | Local | `run_local.py` | written in the file |
-| Tests | `tests/conftest.py` | `tests/support/app_settings.py` |
 | Docker / Helm | `docker/entrypoint.py` | `CLUSTER_CLIENT_*` env vars (all listed in `.env.example`) |
 
 ## Usage
@@ -38,7 +36,7 @@ curl -X POST http://127.0.0.1:8000/ \
 ```
 
 The request body, if any, is sent to the cluster as is. An incoming `traceparent` is continued to the
-cluster and returned in the response. The headers in `CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS`
+cluster, and the response carries `traceresponse`. The headers in `CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS`
 (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent on to the cluster as they are.
 
 | Case | Status | `x-edge-error` | Body |
@@ -46,8 +44,10 @@ cluster and returned in the response. The headers in `CLUSTER_CLIENT_FORWARDING_
 | Answer matches the schema | the cluster's | none | the cluster's, unchanged (with its headers) |
 | Answer is not JSON or breaks the schema | 502 | `response_rejected` | `{"error", "reason", "field"}` |
 | Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `connection_failed` | `{"error", "reason"}` |
-| Request sent, no full answer (read timeout, connection cut) | 504 | `timeout` | `{"error", "reason"}` |
+| Request may have been sent, no full answer (read timeout, connection cut, TLS error) | 504 | `timeout` | `{"error", "reason"}` |
 | A required header is missing or invalid | 400 | `invalid_request` | the validation errors |
+| Wrong path or method on the cluster client | 404, 405 | `invalid_request` | `{"detail"}` |
+| Unexpected error inside the cluster client | 500 | `internal_error` | `{"error", "reason"}` (the error type only) |
 
 `x-edge-error` is on every answer the cluster client made itself, and never on a cluster answer. A
 `response_rejected` answer also carries the cluster's status in `x-edge-cluster-status`. Status codes, error
@@ -80,8 +80,7 @@ CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH=config/examples/response-schema.json \
 CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH=config/examples/ignored-fields.json python docker/entrypoint.py
 ```
 
-`tests/integration/config/test_examples.py` runs real cluster answers (`tests/support/cluster_samples/`,
-passwords replaced) through it.
+Real cluster answers, passwords replaced, are kept in `tests/support/cluster_samples/`.
 
 Health probes: `GET /health/live`, `GET /health/ready`.
 
@@ -93,7 +92,7 @@ Health probes: `GET /health/live`, `GET /health/ready`.
 | Main file `logs/app.log` | off, DEBUG, `json` | `CLUSTER_CLIENT_LOG__FILE__*` |
 | Failure file `logs/failures.log` | on, one JSON line per failed request | `CLUSTER_CLIENT_LOG__FAILURE_FILE__*` |
 
-Every line carries the `trace_id`; find a failure by the trace id of its response:
+Every line of a request carries the `trace_id`; find a failure by the trace id of its `traceresponse`:
 
 ```bash
 grep '"trace_id": "<trace id>"' logs/failures.log
@@ -102,7 +101,7 @@ grep '"trace_id": "<trace id>"' logs/failures.log
 In code, logging is done by decorators:
 
 ```python
-from app.logger import log_debug, log_info
+from app.logger.decorators import log_debug, log_info
 
 
 @log_info(inputs=("request.method", "request.url"), outputs=("status_code",))
@@ -113,14 +112,19 @@ def send_to_cluster(*, request: ClusterRequest, ...) -> ClusterResponse: ...
 - `@log_debug` (every function): DEBUG lines with all arguments, and the return value or the error.
 - `@log_info(inputs=..., outputs=...)` (key steps): one INFO line with the chosen values and the duration.
 
+## Telemetry
+
+Tracing is OpenTelemetry. Spans are sent over OTLP only when enabled:
+
+```bash
+CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED=true
+CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT=http://collector:4318
+```
+
 ## Tests
 
 ```bash
-pytest                 # all tiers
-pytest -m unit
-pytest -m integration
-pytest -m e2e          # real servers on free ports
-pytest --cov=app
+pytest
 ```
 
 ## Lint

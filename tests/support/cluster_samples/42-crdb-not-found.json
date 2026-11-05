@@ -1,0 +1,9 @@
+{
+  "body": {
+    "description": "crdb:8c173076-c259-4b5f-826d-b94d0ff956ca does not exist",
+    "error_code": "not_found"
+  },
+  "method": "GET",
+  "path": "/v1/crdbs/8c173076-c259-4b5f-826d-b94d0ff956ca",
+  "status": 404
+}

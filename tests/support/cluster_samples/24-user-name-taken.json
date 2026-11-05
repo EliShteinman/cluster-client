@@ -1,0 +1,9 @@
+{
+  "body": {
+    "description": "User with the same name already exists",
+    "error_code": "name_already_exists"
+  },
+  "method": "POST",
+  "path": "/v1/users",
+  "status": 409
+}

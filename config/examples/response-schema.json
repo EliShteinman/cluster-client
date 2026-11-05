@@ -1,0 +1,517 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Example: one schema for every Redis Enterprise answer the manager needs. Passwords and certificates are forbidden; config/examples/ignored-fields.json removes them first.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/error"
+    },
+    {
+      "$ref": "#/$defs/action_started"
+    },
+    {
+      "$ref": "#/$defs/bdb"
+    },
+    {
+      "$ref": "#/$defs/bdb_list"
+    },
+    {
+      "$ref": "#/$defs/redis_acl"
+    },
+    {
+      "$ref": "#/$defs/redis_acl_list"
+    },
+    {
+      "$ref": "#/$defs/role"
+    },
+    {
+      "$ref": "#/$defs/role_list"
+    },
+    {
+      "$ref": "#/$defs/user"
+    },
+    {
+      "$ref": "#/$defs/user_list"
+    },
+    {
+      "$ref": "#/$defs/crdb"
+    },
+    {
+      "$ref": "#/$defs/crdb_list"
+    },
+    {
+      "$ref": "#/$defs/crdb_task"
+    },
+    {
+      "$ref": "#/$defs/action"
+    },
+    {
+      "$ref": "#/$defs/cluster"
+    },
+    {
+      "$ref": "#/$defs/cluster_stats"
+    }
+  ],
+  "$defs": {
+    "error": {
+      "type": "object",
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "action_started": {
+      "type": "object",
+      "required": [
+        "action_uid"
+      ],
+      "properties": {
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "bdb": {
+      "type": "object",
+      "allOf": [
+        {
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "authentication_admin_pass",
+                "authentication_redis_pass",
+                "authentication_sasl_pass"
+              ]
+            }
+          }
+        }
+      ],
+      "required": [
+        "uid",
+        "name",
+        "memory_size",
+        "status"
+      ],
+      "properties": {
+        "uid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "memory_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string"
+        },
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crdt_guid": {
+          "type": "string"
+        },
+        "roles_permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "role_uid",
+              "redis_acl_uid"
+            ],
+            "properties": {
+              "role_uid": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "redis_acl_uid": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "bdb_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/bdb"
+      }
+    },
+    "redis_acl": {
+      "type": "object",
+      "required": [
+        "uid",
+        "name",
+        "acl"
+      ],
+      "properties": {
+        "uid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "acl": {
+          "type": "string"
+        },
+        "min_version": {
+          "type": "string"
+        },
+        "max_version": {
+          "type": "string"
+        },
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "redis_acl_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/redis_acl"
+      }
+    },
+    "role": {
+      "type": "object",
+      "required": [
+        "uid",
+        "name",
+        "management"
+      ],
+      "properties": {
+        "uid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string"
+        },
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "uids"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "uids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "role_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/role"
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": [
+        "uid",
+        "name",
+        "role_uids",
+        "status"
+      ],
+      "properties": {
+        "uid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "role_uids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "auth_method": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "email_alerts": {
+          "type": "boolean"
+        },
+        "last_login": {
+          "type": "integer"
+        },
+        "password_issue_date": {
+          "type": "string"
+        },
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "user_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/user"
+      }
+    },
+    "crdb": {
+      "type": "object",
+      "required": [
+        "guid",
+        "name",
+        "default_db_config",
+        "instances"
+      ],
+      "properties": {
+        "guid": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "default_db_config": {
+          "type": "object",
+          "allOf": [
+            {
+              "propertyNames": {
+                "not": {
+                  "enum": [
+                    "authentication_admin_pass",
+                    "authentication_redis_pass",
+                    "authentication_sasl_pass"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "cluster"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "db_uid": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "cluster": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "url"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "db_config": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "allOf": [
+                  {
+                    "propertyNames": {
+                      "not": {
+                        "enum": [
+                          "authentication_admin_pass",
+                          "authentication_redis_pass",
+                          "authentication_sasl_pass"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "local_databases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "bdb_uid"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "bdb_uid": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "crdb_list": {
+      "type": "object",
+      "required": [
+        "crdbs"
+      ],
+      "properties": {
+        "crdbs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/crdb"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "crdb_task": {
+      "type": "object",
+      "required": [
+        "id",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "crdb_guid": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "errors": {
+          "type": "array"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "action_uid",
+        "status",
+        "name",
+        "task_id"
+      ],
+      "properties": {
+        "action_uid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        }
+      }
+    },
+    "cluster": {
+      "type": "object",
+      "required": [
+        "name",
+        "cm_port"
+      ],
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "proxy_certificate",
+            "syncer_certificate",
+            "cluster_ssh_public_key"
+          ]
+        }
+      },
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "cluster_stats": {
+      "type": "object",
+      "required": [
+        "provisional_memory",
+        "available_memory"
+      ],
+      "properties": {
+        "provisional_memory": {
+          "type": "number"
+        },
+        "available_memory": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

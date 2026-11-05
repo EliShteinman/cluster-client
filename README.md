@@ -1,0 +1,170 @@
+# cluster-client
+
+Runs inside each network. The manager sends it a request; it calls the Redis Enterprise REST API of the
+cluster named in the request, checks the answer against a JSON schema, and returns it.
+
+## Installation
+
+```bash
+uv sync
+uv run pre-commit install
+cp .env.example .env
+```
+
+## Run
+
+```bash
+python run_local.py
+```
+
+The app is built by `app.main.create_app(settings)`. Each environment passes its own `Settings`:
+
+| Environment | Entry | Settings come from |
+|---|---|---|
+| Local | `run_local.py` | written in the file |
+| Docker / Helm | `docker/entrypoint.py` | `CLUSTER_CLIENT_*` env vars (all listed in `.env.example`) |
+
+## Usage
+
+`POST /` with the call to make in headers (names set by `CLUSTER_CLIENT_HEADERS__*`):
+
+```bash
+curl -X POST http://127.0.0.1:8000/ \
+  -H "x-cluster-method: GET" \
+  -H "x-cluster-url: https://cluster.example:9443/v1/bdbs" \
+  -H "x-cluster-authorization: Basic <credentials>"
+```
+
+The request body, if any, is sent to the cluster as is. An incoming `traceparent` is continued to the
+cluster, and the response carries `traceresponse`. The headers in `CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS`
+(`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent on to the cluster as they are.
+
+| Case | Status | `x-edge-error` | Body |
+|---|---|---|---|
+| Answer matches the schema | the cluster's | none | the cluster's, unchanged (with its headers) |
+| Answer is not JSON or breaks the schema | 502 | `response_rejected` | `{"error", "reason", "field"}` |
+| Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `connection_failed` | `{"error", "reason"}` |
+| Request may have been sent, no full answer (read timeout, connection cut, TLS error) | 504 | `timeout` | `{"error", "reason"}` |
+| A required header is missing or invalid | 400 | `invalid_request` | the validation errors |
+| Wrong path or method on the cluster client | 404, 405 | `invalid_request` | `{"detail"}` |
+| Unexpected error inside the cluster client | 500 | `internal_error` | `{"error", "reason"}` (the error type only) |
+
+`x-edge-error` is on every answer the cluster client made itself, and never on a cluster answer. A
+`response_rejected` answer also carries the cluster's status in `x-edge-cluster-status`. Status codes, error
+codes and header names are set by `CLUSTER_CLIENT_FAILURES__*`.
+
+Three files are read at startup; replace them without touching the code or the image:
+
+| File | Setting | Content |
+|---|---|---|
+| `config/response-schema.json` | `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | the JSON Schema every answer must match |
+| `config/ignored-fields.json` | `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | field paths removed before the check |
+| `config/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log (passwords) |
+
+Ignored and redacted fields use the same format as `field` in a rejection, with `[*]` for every item of a list:
+
+```json
+["$[*].shards_placement", "$.endpoints[*].internal_id"]
+```
+
+When a field is removed, the answer is re-encoded; otherwise it is returned byte for byte.
+
+### Example configuration
+
+`config/examples/` holds a schema and ignored fields for every Redis Enterprise answer the manager uses (bdb,
+redis_acl, role, user, crdb, crdb task, action, cluster, stats, errors). The schema forbids passwords and
+certificates; the ignored fields remove them first, so the answer passes without them. Run it:
+
+```bash
+CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH=config/examples/response-schema.json \
+CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH=config/examples/ignored-fields.json python docker/entrypoint.py
+```
+
+Real cluster answers, passwords replaced, are kept in `tests/support/cluster_samples/`.
+
+Health probes: `GET /health/live`, `GET /health/ready`.
+
+## Logging
+
+| Output | Default | Setting |
+|---|---|---|
+| Terminal (stdout) | on, INFO, `line` | `CLUSTER_CLIENT_LOG__CONSOLE__*` |
+| Main file `logs/app.log` | off, DEBUG, `json` | `CLUSTER_CLIENT_LOG__FILE__*` |
+| Failure file `logs/failures.log` | on, one JSON line per failed request | `CLUSTER_CLIENT_LOG__FAILURE_FILE__*` |
+
+Every line of a request carries the `trace_id`; find a failure by the trace id of its `traceresponse`:
+
+```bash
+grep '"trace_id": "<trace id>"' logs/failures.log
+```
+
+In code, logging is done by decorators:
+
+```python
+from app.logger.decorators import log_debug, log_info
+
+
+@log_info(inputs=("request.method", "request.url"), outputs=("status_code",))
+@log_debug
+def send_to_cluster(*, request: ClusterRequest, ...) -> ClusterResponse: ...
+```
+
+- `@log_debug` (every function): DEBUG lines with all arguments, and the return value or the error.
+- `@log_info(inputs=..., outputs=...)` (key steps): one INFO line with the chosen values and the duration.
+
+## Telemetry
+
+Tracing is OpenTelemetry. Spans are sent over OTLP only when enabled:
+
+```bash
+CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED=true
+CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT=http://collector:4318
+```
+
+## Tests
+
+```bash
+pytest
+```
+
+## Lint
+
+```bash
+ruff check . && ruff format .
+```
+
+## Docker
+
+```bash
+docker build -f docker/Dockerfile -t cluster-client:0.1.0 .
+docker run --rm -p 8000:8000 --read-only -v /app/logs -v "$PWD/config:/etc/cluster-client:ro" cluster-client:0.1.0
+```
+
+## Helm
+
+```bash
+helm lint helm
+helm upgrade --install cluster-client helm -f my-values.yaml
+```
+
+`my-values.yaml` holds only what differs from `helm/values.yaml`. `helm/values.schema.json` rejects any unknown
+key or invalid value.
+
+| Key | Content |
+|---|---|
+| `image` | `repository`, `tag` (default: the chart's `appVersion`), `pullPolicy` |
+| `route` | OpenShift Route: `host` (empty: generated by OpenShift), `tls` |
+| `config` | `CLUSTER_CLIENT_*` env vars, rendered into a ConfigMap |
+| `secret` | `CLUSTER_CLIENT_*` env vars, rendered into a Secret |
+| `files` | `response-schema.json`, `ignored-fields.json`, `redacted-fields.json` as YAML, mounted at `mounts.files` |
+| `resources` | requests / limits |
+
+The manager's address is the Route's host:
+
+```bash
+oc get route cluster-client -o jsonpath='{.spec.host}'
+```
+
+## Diagrams
+
+`docs/diagrams/flow.drawio` (request flow) and `docs/diagrams/class-diagram.drawio` (classes in that flow).

@@ -1,0 +1,101 @@
+{
+  "body": {
+    "crdbs": [
+      {
+        "causal_consistency": false,
+        "default_db_config": {
+          "memory_size": 104857600,
+          "module_list": [
+            {
+              "module_args": "",
+              "module_name": "ReJSON"
+            },
+            {
+              "module_args": "",
+              "module_name": "search"
+            }
+          ],
+          "name": "probe-aa",
+          "port": 12000,
+          "tls_mode": "disabled"
+        },
+        "encryption": false,
+        "featureset_version": 12,
+        "force_removed_instances": {},
+        "ghost_instance_ids": [],
+        "guid": "e6a13094-bebc-4746-93d1-9c71d53a8134",
+        "instances": [
+          {
+            "cluster": {
+              "credentials": {
+                "password": "sample-secret",
+                "username": "admin@redis.local"
+              },
+              "name": "cluster1.local",
+              "url": "https://cluster1.local:9443"
+            },
+            "compression": 3,
+            "db_config": {
+              "authentication_admin_pass": "sample-secret",
+              "module_list": [
+                {
+                  "module_args": "",
+                  "module_name": "ReJSON"
+                },
+                {
+                  "module_args": "",
+                  "module_name": "search"
+                }
+              ]
+            },
+            "db_uid": "11",
+            "id": 1
+          },
+          {
+            "cluster": {
+              "credentials": {
+                "password": "sample-secret",
+                "username": "admin@redis.local"
+              },
+              "name": "cluster2.local",
+              "url": "https://cluster2.local:9443"
+            },
+            "compression": 3,
+            "db_config": {
+              "authentication_admin_pass": "sample-secret",
+              "module_list": [
+                {
+                  "module_args": "",
+                  "module_name": "ReJSON"
+                },
+                {
+                  "module_args": "",
+                  "module_name": "search"
+                }
+              ]
+            },
+            "id": 2
+          }
+        ],
+        "local_databases": [
+          {
+            "bdb_uid": "11",
+            "id": 1
+          }
+        ],
+        "managed_by": "",
+        "modules": [
+          {
+            "featureset_version": 0,
+            "module_name": "ReJSON"
+          }
+        ],
+        "name": "probe-aa",
+        "protocol_version": 1
+      }
+    ]
+  },
+  "method": "GET",
+  "path": "/v1/crdbs",
+  "status": 200
+}

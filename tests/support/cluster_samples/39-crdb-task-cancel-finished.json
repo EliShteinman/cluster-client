@@ -1,0 +1,9 @@
+{
+  "body": {
+    "description": "Can't cancel a task that finished processing",
+    "error_code": "invalid_input"
+  },
+  "method": "POST",
+  "path": "/v1/crdb_tasks/fe7f2521-11ad-4809-b36a-3e75e84e1cf7/actions/cancel",
+  "status": 406
+}

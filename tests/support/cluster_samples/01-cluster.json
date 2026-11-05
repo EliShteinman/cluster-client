@@ -1,0 +1,268 @@
+{
+  "body": {
+    "alert_settings": {
+      "cluster_bdb_import_invalid_path": true,
+      "cluster_ca_cert_about_to_expire": {
+        "enabled": true,
+        "threshold": "90"
+      },
+      "cluster_certs_about_to_expire": {
+        "enabled": true,
+        "threshold": "45"
+      },
+      "cluster_license_about_to_expire": {
+        "enabled": true,
+        "threshold": "7"
+      },
+      "cluster_node_operation_failed": true,
+      "cluster_ocsp_query_failed": true,
+      "cluster_ocsp_status_revoked": true,
+      "cluster_users_count_approaches_limit": {
+        "enabled": true,
+        "threshold": "90"
+      },
+      "node_checks_error": true,
+      "node_cpu_utilization": {
+        "enabled": false,
+        "threshold": ""
+      },
+      "node_ephemeral_storage": {
+        "enabled": true,
+        "threshold": "70"
+      },
+      "node_free_flash": {
+        "enabled": true,
+        "threshold": "70"
+      },
+      "node_internal_certs_about_to_expire": {
+        "enabled": true,
+        "threshold": "45"
+      },
+      "node_memory": {
+        "enabled": false,
+        "threshold": ""
+      },
+      "node_net_throughput": {
+        "enabled": false,
+        "threshold": ""
+      },
+      "node_persistent_storage": {
+        "enabled": true,
+        "threshold": "70"
+      }
+    },
+    "allow_modules_upload": false,
+    "asm_client_maint_notifications": false,
+    "availability_api": "auto",
+    "availability_lag_tolerance_ms": 100,
+    "bigstore_driver": "speedb",
+    "block_cluster_changes": false,
+    "ccs_internode_encryption": true,
+    "client_eviction": "auto",
+    "client_maint_notifications": false,
+    "cluster_api_internal_port": 3346,
+    "cluster_ssh_public_key": "ssh-rsa sample",
+    "clusterset_on_topology_changed": true,
+    "cm_port": 8443,
+    "cm_session_timeout_minutes": 15,
+    "cnm_http_max_threads_per_worker": 10,
+    "cnm_http_port": 8080,
+    "cnm_http_workers": 1,
+    "cnm_https_port": 9443,
+    "control_cipher_suites": "DEFAULT:!3DES",
+    "control_cipher_suites_tls_1_3": "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256",
+    "control_plane_basic_authentication": true,
+    "crdb_coordinator_ignore_requests": false,
+    "crdb_coordinator_port": 9081,
+    "crdt_supported_featureset_version": 10,
+    "crdt_supported_featureset_version_map": {
+      "6.2": 10,
+      "7.2": 10,
+      "7.4": 10,
+      "8.0": 10,
+      "8.2": 10,
+      "8.4": 12,
+      "8.6": 12,
+      "99.99": 12
+    },
+    "crdt_supported_module_featureset_version_map": {
+      "ReJSON": {
+        "2.6.25": [
+          0,
+          0
+        ],
+        "2.8.20": [
+          0,
+          0
+        ],
+        "8.0.7": [
+          0,
+          0
+        ],
+        "8.2.12": [
+          0,
+          0
+        ],
+        "8.4.7": [
+          0,
+          0
+        ],
+        "8.6.6": [
+          0,
+          0
+        ]
+      }
+    },
+    "crdt_supported_protocol_versions": [
+      "1"
+    ],
+    "crdt_supported_protocol_versions_map": {
+      "6.2": [
+        1
+      ],
+      "7.2": [
+        1
+      ],
+      "7.4": [
+        1
+      ],
+      "8.0": [
+        1
+      ],
+      "8.2": [
+        1
+      ],
+      "8.4": [
+        1
+      ],
+      "8.6": [
+        1
+      ],
+      "99.99": [
+        1
+      ]
+    },
+    "created_time": "2026-10-25T09:07:58Z",
+    "data_cipher_list": "DEFAULT:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA",
+    "data_cipher_suites_tls_1_3": [],
+    "debuginfo_path": "/tmp",
+    "disconnect_clients_on_password_removal": "auto",
+    "dmc_external_authentication": true,
+    "dmc_external_cba_authentication": true,
+    "dmc_external_entraid_authentication": true,
+    "dmc_external_ldap_authentication": true,
+    "email_alerts": false,
+    "encrypt_pkeys": false,
+    "entra_id_cache_ttl": 30,
+    "entra_id_validate_username": true,
+    "envoy_admin_port": 8002,
+    "envoy_external_authorization": true,
+    "envoy_max_downstream_connections": 1024,
+    "envoy_mgmt_server_port": 8004,
+    "grpc_cluster_wd": true,
+    "grpc_gossip": true,
+    "grpc_gossip_only": true,
+    "grpc_info_provider": false,
+    "handle_metrics_redirects": false,
+    "handle_redirects": false,
+    "http_support": true,
+    "logrotate_settings": {
+      "maxage": 7,
+      "maxsize": "200M",
+      "rotate": 10
+    },
+    "mask_bdb_credentials": false,
+    "metrics_auth": false,
+    "metrics_system": 0,
+    "min_control_TLS_version": "1.2",
+    "min_data_TLS_version": "1.2",
+    "min_sentinel_TLS_version": "1.2",
+    "mtls_authorized_subjects": [],
+    "mtls_certificate_authentication": false,
+    "mtls_client_cert_subject_validation_type": "disabled",
+    "multi_commands_opt": "batch",
+    "name": "cluster1.local",
+    "options_method_forbidden": false,
+    "oss_cluster_client_maint_notifications": false,
+    "password_complexity": false,
+    "password_expiration_duration": 0,
+    "password_hashing_algorithm": "SHA-256",
+    "password_min_length": 8,
+    "pdns_server_type": "legacy",
+    "proxy_certificate": "-----BEGIN CERTIFICATE-----sample",
+    "rack_aware": false,
+    "redis_flex_multitenant": false,
+    "replica_sconns_on_demand": "auto",
+    "reserved_ports": [],
+    "robust_crdt_syncer": true,
+    "s3_certificate_verification": true,
+    "sentinel_cipher_suites": [],
+    "sentinel_cipher_suites_tls_1_3": "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256",
+    "sentinel_tls_mode": "allowed",
+    "shared_strings_enabled": true,
+    "slave_ha": true,
+    "slave_ha_bdb_cooldown_period": 7200,
+    "slave_ha_cooldown_period": 3600,
+    "slave_ha_grace_period": 600,
+    "slowlog_in_sanitized_support": true,
+    "smtp_tls_mode": "none",
+    "state_machine_smart_client_handoffs_asm_delay_ms": 100,
+    "state_machine_smart_client_handoffs_delay_ms": 2000,
+    "streamlined_translation": "auto",
+    "syncer_certificate": "-----BEGIN CERTIFICATE-----sample",
+    "system_reserved_ports": [
+      53,
+      1968,
+      3333,
+      3334,
+      3335,
+      3336,
+      3339,
+      3340,
+      3341,
+      3342,
+      3343,
+      3344,
+      3345,
+      3346,
+      3348,
+      3349,
+      3350,
+      3351,
+      3352,
+      3353,
+      3354,
+      3356,
+      3358,
+      3359,
+      3380,
+      5353,
+      8000,
+      8001,
+      8002,
+      8004,
+      8070,
+      8071,
+      8080,
+      8443,
+      8444,
+      9080,
+      9081,
+      9091,
+      9125,
+      9443,
+      10050,
+      36379
+    ],
+    "upgrade_in_progress": false,
+    "upgrade_mode": false,
+    "usage_report_fields": "restricted",
+    "use_external_ipv6": true,
+    "use_grpc_syncer_communication": true,
+    "uuid": "d2677570-8f2e-440e-9770-f18518036be6",
+    "wait_command": true
+  },
+  "method": "GET",
+  "path": "/v1/cluster",
+  "status": 200
+}

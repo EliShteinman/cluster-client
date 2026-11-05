@@ -1,0 +1,52 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request, Response
+from jsonschema import Draft202012Validator
+
+from app.cluster_client import send_to_cluster
+from app.config.settings import Settings
+from app.errors import RequestFailedError
+from app.failures.log import record_failure
+from app.failures.response import failure_response
+from app.field_paths import FieldPath
+from app.logger.decorators import log_debug, log_info
+from app.models import ClusterRequest, ClusterResponse
+from app.response_builder import build_response
+from app.routes.read_request import read_body, read_cluster_request
+
+cluster_router: APIRouter = APIRouter()
+
+
+@cluster_router.post(path="/")
+@log_info(outputs=("status_code",))
+@log_debug
+def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(dependency=read_body)]) -> Response:
+    settings: Settings = request.app.state.settings
+    schema: Draft202012Validator = request.app.state.schema
+    ignored_fields: tuple[FieldPath, ...] = request.app.state.ignored_fields
+    redacted_fields: tuple[FieldPath, ...] = request.app.state.redacted_fields
+    cluster_request: ClusterRequest = read_cluster_request(
+        headers=dict(request.headers), body=body, settings=settings
+    )
+    cluster_response: ClusterResponse | None = None
+    try:
+        cluster_response = send_to_cluster(request=cluster_request, settings=settings.forwarding)
+        cluster_response = build_response(
+            cluster_response=cluster_response, schema=schema, ignored_fields=ignored_fields
+        )
+    except RequestFailedError as failure:
+        record_failure(
+            request=cluster_request,
+            failure=failure,
+            cluster_response=cluster_response,
+            redacted_fields=redacted_fields,
+            settings=settings,
+        )
+        cluster_response = failure_response(
+            failure=failure, cluster_response=cluster_response, settings=settings
+        )
+    return Response(
+        content=cluster_response.content,
+        status_code=cluster_response.status_code,
+        headers=cluster_response.headers,
+    )

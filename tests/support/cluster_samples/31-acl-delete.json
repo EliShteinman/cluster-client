@@ -1,0 +1,8 @@
+{
+  "body": {
+    "action_uid": "f0cc0b01-6a01-45b8-80b9-6c352b42458d"
+  },
+  "method": "DELETE",
+  "path": "/v1/redis_acls/3",
+  "status": 200
+}

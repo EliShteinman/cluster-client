@@ -5,9 +5,9 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from app.config import TEXT_ENCODING
+from app.config.base import TEXT_ENCODING
 from app.errors import FieldPathsLoadError
-from app.logger import log_debug, log_info
+from app.logger.decorators import log_debug, log_info
 
 ROOT: str = "$"
 ALL_ITEMS: str = "[*]"
@@ -23,9 +23,12 @@ def load_field_paths(*, path: Path) -> tuple[FieldPath, ...]:
         paths: JsonValue = json.loads(s=path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as error:
         raise FieldPathsLoadError(path=path, reason=str(error)) from error
-    if not isinstance(paths, list) or not all(isinstance(field, str) for field in paths):
+    fields: list[str] = (
+        [field for field in paths if isinstance(field, str)] if isinstance(paths, list) else []
+    )
+    if not isinstance(paths, list) or len(fields) != len(paths):
         raise FieldPathsLoadError(path=path, reason="the file must be a JSON list of field paths")
-    return tuple(parse_field_path(field=field, path=path) for field in paths)
+    return tuple(parse_field_path(field=field, path=path) for field in fields)
 
 
 @log_debug
@@ -43,7 +46,7 @@ def parse_field_path(*, field: str, path: Path) -> FieldPath:
 def remove_fields(*, body: JsonValue, field_paths: tuple[FieldPath, ...]) -> JsonValue:
     if not field_paths:
         return body
-    cleaned: JsonValue = copy.deepcopy(body)
+    cleaned: JsonValue = copy.deepcopy(x=body)
     for field_path in field_paths:
         remove_field(node=cleaned, field_path=field_path)
     return cleaned

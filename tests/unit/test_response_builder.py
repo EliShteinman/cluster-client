@@ -31,9 +31,10 @@ def test_valid_body_is_returned_byte_for_byte() -> None:
     assert build(content=b'{"uid":1,  "name":"db"}').content == b'{"uid":1,  "name":"db"}'
 
 
-def test_non_json_body_is_rejected_at_the_root() -> None:
+@pytest.mark.parametrize("content", [b"<html>", b"\xff", b'{"a":"\xff"}'])
+def test_non_json_body_is_rejected_at_the_root(content: bytes) -> None:
     with pytest.raises(ResponseRejectedError) as raised:
-        build(content=b"<html>")
+        build(content=content)
 
     assert raised.value.field == "$"
 

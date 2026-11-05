@@ -1,6 +1,6 @@
-from app.config import FailureCode, FailureSettings
+from app.config.failures import FailureCode, FailureSettings
 from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError
-from app.logger import log_debug
+from app.logger.decorators import log_debug
 
 
 @log_debug

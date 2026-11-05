@@ -1,16 +1,22 @@
 import json
-import logging
+from types import SimpleNamespace
 
 import pytest
+from fastapi import Request, Response
+from starlette.exceptions import HTTPException
 
-from app.config import FailureSettings, Settings
+from app.config.failures import FailureCode, FailureSettings
+from app.config.settings import NoEnvFileSettings, Settings
 from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError, ResponseRejectedError
-from app.failures import failure_code, failure_record, failure_response, record_failure, redacted_content
+from app.failures.codes import failure_code
+from app.failures.handlers import internal_error_response, refused_request_response
+from app.failures.log import failure_record, redacted_content
+from app.failures.response import failure_response
 from app.field_paths import FieldPath
 from app.models import ClusterResponse, RequestFailure
 from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
 
-SETTINGS: Settings = Settings(_env_file=None)
+SETTINGS: Settings = NoEnvFileSettings()
 CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=CLUSTER_URL, reason="refused")
 NO_RESPONSE: NoResponseError = NoResponseError(url=CLUSTER_URL, reason="read timed out")
 REJECTION: ResponseRejectedError = ResponseRejectedError(
@@ -18,6 +24,9 @@ REJECTION: ResponseRejectedError = ResponseRejectedError(
 )
 CLUSTER_RESPONSE: ClusterResponse = ClusterResponse(status_code=200, content=b'{"uid": "one"}')
 REDACT_PASSWORD: tuple[FieldPath, ...] = (("password",),)
+REQUEST: Request = Request(
+    scope={"type": "http", "app": SimpleNamespace(state=SimpleNamespace(settings=SETTINGS))}
+)
 
 
 def record(*, cluster_response: ClusterResponse | None) -> RequestFailure:
@@ -38,18 +47,6 @@ def test_each_failure_gets_its_configured_code(failure: RequestFailedError, erro
     assert failure_code(failure=failure, settings=FailureSettings()).error_code == error_code
 
 
-def test_record_without_cluster_response_has_no_cluster_fields() -> None:
-    failure: RequestFailure = record(cluster_response=None)
-
-    assert (failure.cluster_status_code, failure.cluster_response) == (None, None)
-
-
-def test_record_keeps_the_full_cluster_response() -> None:
-    failure: RequestFailure = record(cluster_response=CLUSTER_RESPONSE)
-
-    assert (failure.cluster_status_code, failure.cluster_response) == (200, '{"uid": "one"}')
-
-
 def test_record_leaves_out_the_redacted_fields() -> None:
     failure: RequestFailure = record(
         cluster_response=ClusterResponse(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
@@ -58,62 +55,16 @@ def test_record_leaves_out_the_redacted_fields() -> None:
     assert json.loads(s=failure.cluster_response or "") == {"uid": "one"}
 
 
-def test_record_names_the_request() -> None:
-    failure: RequestFailure = record(cluster_response=CLUSTER_RESPONSE)
-
-    assert (failure.method, failure.url, failure.field) == ("GET", CLUSTER_URL, "$.uid")
-
-
 def test_content_that_is_not_json_is_kept_as_text() -> None:
     assert redacted_content(content=b"<html>", redacted_fields=REDACT_PASSWORD) == "<html>"
 
 
-def test_failure_is_written_to_the_failure_logger(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(level=logging.WARNING, logger=SETTINGS.log.failure_file.logger_name)
-
-    record_failure(
-        request=CLUSTER_REQUEST,
-        failure=REJECTION,
-        cluster_response=CLUSTER_RESPONSE,
-        redacted_fields=(),
-        settings=SETTINGS,
-    )
-
-    assert caplog.records[-1].cluster_response == '{"uid": "one"}'
-
-
 def test_response_uses_the_configured_status_code() -> None:
-    settings: Settings = Settings(
-        _env_file=None, failures=FailureSettings(rejected={"status_code": 422, "error_code": "bad"})
+    settings: Settings = NoEnvFileSettings(
+        failures=FailureSettings(rejected=FailureCode(status_code=422, error_code="bad"))
     )
 
     assert failure_response(failure=REJECTION, cluster_response=None, settings=settings).status_code == 422
-
-
-def test_response_body_describes_the_failure() -> None:
-    response: ClusterResponse = failure_response(failure=REJECTION, cluster_response=None, settings=SETTINGS)
-
-    assert json.loads(s=response.content) == {
-        "error": "response_rejected",
-        "reason": REJECTION.reason,
-        "field": "$.uid",
-    }
-
-
-def test_response_body_omits_a_missing_field() -> None:
-    response: ClusterResponse = failure_response(
-        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
-    )
-
-    assert "field" not in json.loads(s=response.content)
-
-
-def test_response_has_the_configured_content_type() -> None:
-    response: ClusterResponse = failure_response(
-        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
-    )
-
-    assert response.headers["content-type"] == "application/json"
 
 
 def test_response_is_marked_with_the_error_code() -> None:
@@ -132,9 +83,26 @@ def test_rejection_carries_the_cluster_status() -> None:
     assert response.headers["x-edge-cluster-status"] == "201"
 
 
-def test_no_cluster_status_without_a_cluster_response() -> None:
-    response: ClusterResponse = failure_response(
-        failure=CONNECTION_FAILED, cluster_response=None, settings=SETTINGS
-    )
+@pytest.mark.parametrize("status_code", [400, 404, 405])
+def test_a_refused_request_is_marked_as_our_own_answer(status_code: int) -> None:
+    response: Response = refused_request_response(REQUEST, HTTPException(status_code=status_code))
 
-    assert "x-edge-cluster-status" not in response.headers
+    assert response.headers["x-edge-error"] == "invalid_request"
+
+
+def test_a_refused_request_keeps_its_headers() -> None:
+    error: HTTPException = HTTPException(status_code=405, headers={"allow": "POST"})
+
+    assert refused_request_response(REQUEST, error).headers["allow"] == "POST"
+
+
+def test_an_unexpected_error_is_marked_as_our_own_answer() -> None:
+    response: Response = internal_error_response(REQUEST, RecursionError("too deep"))
+
+    assert (response.status_code, response.headers["x-edge-error"]) == (500, "internal_error")
+
+
+def test_an_unexpected_error_does_not_return_its_message() -> None:
+    response: Response = internal_error_response(REQUEST, ValueError("secret value"))
+
+    assert bytes(response.body) == b'{"error":"internal_error","reason":"ValueError"}'

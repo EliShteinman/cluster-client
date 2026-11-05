@@ -3,10 +3,10 @@ import json
 from jsonschema import Draft202012Validator
 from pydantic import JsonValue
 
-from app.config import TEXT_ENCODING
+from app.config.base import TEXT_ENCODING
 from app.errors import ResponseRejectedError
 from app.field_paths import ROOT, FieldPath, remove_fields
-from app.logger import log_debug
+from app.logger.decorators import log_debug
 from app.models import ClusterResponse
 from app.schema import validate_body
 
@@ -29,10 +29,8 @@ def build_response(
 def decode_body(*, content: bytes) -> JsonValue:
     try:
         return json.loads(s=content)
-    except json.JSONDecodeError as error:
-        raise ResponseRejectedError(
-            field=ROOT, reason=f"the response body is not JSON: {error.msg}"
-        ) from error
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ResponseRejectedError(field=ROOT, reason=f"the response body is not JSON: {error}") from error
 
 
 @log_debug

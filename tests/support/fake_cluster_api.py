@@ -1,19 +1,28 @@
 import json
+from io import BytesIO
 
 import requests
 from pydantic import JsonValue
 from requests.structures import CaseInsensitiveDict
+from urllib3 import HTTPConnectionPool
 from urllib3.exceptions import MaxRetryError
 
-from app.config import TEXT_ENCODING
+from app.config.base import TEXT_ENCODING
+
+CONNECT_FAILURE: MaxRetryError = MaxRetryError(
+    pool=HTTPConnectionPool(host="cluster"), url="/", reason=ConnectionRefusedError("refused")
+)
 
 
 class SentRequest:
-    def __init__(self, *, method: str, url: str, headers: dict[str, str], data: bytes) -> None:
+    def __init__(
+        self, *, method: str, url: str, headers: dict[str, str], data: bytes, allow_redirects: bool
+    ) -> None:
         self.method: str = method
         self.url: str = url
         self.headers: CaseInsensitiveDict[str] = CaseInsensitiveDict(data=headers)
         self.content: bytes = data
+        self.allow_redirects: bool = allow_redirects
 
 
 class FakeClusterApi:
@@ -41,19 +50,29 @@ class FakeClusterApi:
         self._headers = headers or {}
 
     def go_offline(self) -> None:
-        self.fail_with(error=requests.ConnectionError(MaxRetryError(pool=None, url="/", reason="refused")))
+        self.fail_with(error=requests.ConnectionError(CONNECT_FAILURE))
 
     def fail_with(self, *, error: requests.RequestException) -> None:
         self._error = error
 
     def request(
-        self, *, method: str, url: str, headers: dict[str, str], data: bytes, timeout: float, verify: bool
+        self,
+        *,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        data: bytes,
+        timeout: tuple[float, float],
+        allow_redirects: bool,
+        verify: bool,
     ) -> requests.Response:
-        self.requests.append(SentRequest(method=method, url=url, headers=headers, data=data))
+        self.requests.append(
+            SentRequest(method=method, url=url, headers=headers, data=data, allow_redirects=allow_redirects)
+        )
         if self._error is not None:
             raise self._error
         response: requests.Response = requests.Response()
         response.status_code = self._status_code
         response.headers = CaseInsensitiveDict(data=self._headers)
-        response._content = self._content
+        response.raw = BytesIO(initial_bytes=self._content)
         return response

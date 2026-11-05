@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.logger import log_debug
+from app.logger.decorators import log_debug
 from app.models import HealthStatus
 
 health_router: APIRouter = APIRouter(prefix="/health")

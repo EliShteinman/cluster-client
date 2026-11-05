@@ -1,7 +1,9 @@
-from app.config import TEXT_ENCODING, FailureCode, Settings
+from app.config.base import TEXT_ENCODING
+from app.config.failures import FailureCode
+from app.config.settings import Settings
 from app.errors import RequestFailedError
 from app.failures.codes import failure_code
-from app.logger import log_debug
+from app.logger.decorators import log_debug
 from app.models import ClusterResponse, FailureBody
 
 

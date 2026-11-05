@@ -1,8 +1,8 @@
 from fastapi import HTTPException, Request
 from pydantic import ValidationError
 
-from app.config import Settings
-from app.logger import log_debug
+from app.config.settings import Settings
+from app.logger.decorators import log_debug
 from app.models import ClusterRequest
 
 
@@ -26,5 +26,4 @@ def read_cluster_request(*, headers: dict[str, str], body: bytes, settings: Sett
         raise HTTPException(
             status_code=settings.failures.invalid_request.status_code,
             detail=error.errors(include_url=False, include_input=False),
-            headers={settings.failures.error_header: settings.failures.invalid_request.error_code},
         ) from error

@@ -3,11 +3,13 @@ import logging
 
 from pydantic import JsonValue
 
-from app.config import TEXT_ENCODING, FailureSettings, Settings
+from app.config.base import TEXT_ENCODING
+from app.config.failures import FailureSettings
+from app.config.settings import Settings
 from app.errors import RequestFailedError
 from app.failures.codes import failure_code
 from app.field_paths import FieldPath, remove_fields
-from app.logger import log_debug
+from app.logger.decorators import log_debug
 from app.models import ClusterRequest, ClusterResponse, RequestFailure
 
 

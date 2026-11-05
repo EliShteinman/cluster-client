@@ -5,13 +5,19 @@ from datetime import UTC, datetime
 
 from pydantic import JsonValue
 
-from app.config import FormattingSettings, LogFormat
-from app.logger.tracing import TRACE_FIELDS
+from app.config.logging import FormattingSettings, LogFormat
 
+NO_TRACE: str = "0"
 MISSING_TRACE_PLACEHOLDER: str = "-"
-STANDARD_RECORD_FIELDS: frozenset[str] = (
-    frozenset(vars(logging.makeLogRecord(dict={}))) | {"message", "asctime"} | set(TRACE_FIELDS)
-)
+TRACE_FIELDS: dict[str, str] = {"trace_id": "otelTraceID", "span_id": "otelSpanID"}
+STANDARD_RECORD_FIELDS: frozenset[str] = frozenset(vars(logging.makeLogRecord(dict={}))) | {
+    "message",
+    "asctime",
+    "otelTraceID",
+    "otelSpanID",
+    "otelTraceSampled",
+    "otelServiceName",
+}
 
 
 class JsonFormatter(logging.Formatter):
@@ -21,17 +27,26 @@ class JsonFormatter(logging.Formatter):
 
 def payload_of(*, record: logging.LogRecord) -> dict[str, JsonValue]:
     payload: dict[str, JsonValue] = {
-        "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(timespec="milliseconds"),
+        "timestamp": datetime.fromtimestamp(timestamp=record.created, tz=UTC).isoformat(
+            timespec="milliseconds"
+        ),
         "level": record.levelname,
         "logger": record.name,
         "message": record.getMessage(),
     }
-    payload |= {field: getattr(record, field) for field in TRACE_FIELDS if hasattr(record, field)}
+    payload |= trace_fields_of(record=record)
     if extra := extra_fields_of(record=record):
         payload["extra"] = extra
     if record.exc_info:
         payload["exception"] = "".join(traceback.format_exception(*record.exc_info))
     return payload
+
+
+def trace_fields_of(*, record: logging.LogRecord) -> dict[str, JsonValue]:
+    fields: dict[str, str] = {
+        name: getattr(record, source, NO_TRACE) for name, source in TRACE_FIELDS.items()
+    }
+    return {name: value for name, value in fields.items() if value != NO_TRACE}
 
 
 def extra_fields_of(*, record: logging.LogRecord) -> dict[str, JsonValue]:
@@ -44,5 +59,5 @@ def build_formatter(*, log_format: LogFormat, settings: FormattingSettings) -> l
     return logging.Formatter(
         fmt=settings.line_pattern,
         datefmt=settings.date_format,
-        defaults=dict.fromkeys(TRACE_FIELDS, MISSING_TRACE_PLACEHOLDER),
+        defaults=dict.fromkeys(TRACE_FIELDS.values(), MISSING_TRACE_PLACEHOLDER),
     )

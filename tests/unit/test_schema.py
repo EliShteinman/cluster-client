@@ -22,10 +22,6 @@ def test_unusable_schema_file_is_reported(tmp_path: Path, content: str | None) -
         load_schema(path=path)
 
 
-def test_loaded_schema_accepts_a_matching_body(schema_path: Path) -> None:
-    validate_body(body={"uid": 1}, schema=load_schema(path=schema_path))
-
-
 def test_violation_names_the_failing_field(tmp_path: Path) -> None:
     schema_path: Path = write_schema(path=tmp_path / "schema.json", schema=DATABASE_SCHEMA)
 

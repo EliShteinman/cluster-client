@@ -41,7 +41,7 @@ class FailureFileSettings(FileSettings):
 
 class FormattingSettings(FrozenModel):
     line_pattern: str = Field(
-        default="%(asctime)s | %(levelname)-8s | %(name)s | trace_id=%(trace_id)s | %(message)s"
+        default="%(asctime)s | %(levelname)-8s | %(name)s | trace_id=%(otelTraceID)s | %(message)s"
     )
     date_format: str = Field(default="%Y-%m-%dT%H:%M:%S%z")
 

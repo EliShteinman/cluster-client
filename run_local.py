@@ -1,19 +1,12 @@
 from pathlib import Path
 
-from app.config import (
-    ConsoleSettings,
-    FailureFileSettings,
-    FileSettings,
-    LogFormat,
-    LoggingSettings,
-    ServerSettings,
-    Settings,
-)
+from app.config.logging import ConsoleSettings, FailureFileSettings, FileSettings, LogFormat, LoggingSettings
+from app.config.server import ServerSettings
+from app.config.settings import NoEnvFileSettings, Settings
 from app.main import create_app
 from app.server import serve
 
-LOCAL_SETTINGS: Settings = Settings(
-    _env_file=None,
+LOCAL_SETTINGS: Settings = NoEnvFileSettings(
     server=ServerSettings(host="127.0.0.1", port=8000),
     log=LoggingSettings(
         level="DEBUG",

@@ -316,6 +316,9 @@
         "CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH": {
           "$ref": "#/$defs/absolutePath"
         },
+        "CLUSTER_CLIENT_FORWARDING__CONNECT_TIMEOUT_SECONDS": {
+          "$ref": "#/$defs/positiveNumber"
+        },
         "CLUSTER_CLIENT_FORWARDING__TIMEOUT_SECONDS": {
           "$ref": "#/$defs/positiveNumber"
         },
@@ -343,6 +346,9 @@
         "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__STATUS_CODE": {
           "$ref": "#/$defs/errorStatusCode"
         },
+        "CLUSTER_CLIENT_FAILURES__INTERNAL_ERROR__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
         "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__ERROR_CODE": {
           "$ref": "#/$defs/errorCode"
         },
@@ -353,6 +359,9 @@
           "$ref": "#/$defs/errorCode"
         },
         "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__INTERNAL_ERROR__ERROR_CODE": {
           "$ref": "#/$defs/errorCode"
         },
         "CLUSTER_CLIENT_FAILURES__ERROR_HEADER": {
@@ -421,8 +430,17 @@
         "CLUSTER_CLIENT_LOG__FORMATTING__DATE_FORMAT": {
           "$ref": "#/$defs/text"
         },
-        "CLUSTER_CLIENT_TRACING__TRACEPARENT_HEADER": {
-          "$ref": "#/$defs/headerName"
+        "CLUSTER_CLIENT_TELEMETRY__SERVICE_NAME": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED": {
+          "$ref": "#/$defs/boolean"
+        },
+        "CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_TELEMETRY__TRACES_PATH": {
+          "$ref": "#/$defs/text"
         }
       }
     }

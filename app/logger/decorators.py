@@ -96,7 +96,9 @@ def wrap_call[**P, R](
         return {name: value for name, value in bound.arguments.items() if name != SELF_PARAMETER}
 
     if inspect.iscoroutinefunction(obj=function):
-        coroutine_function: Callable[P, Awaitable[object]] = cast(Callable[P, Awaitable[object]], function)
+        coroutine_function: Callable[P, Awaitable[object]] = cast(
+            typ=Callable[P, Awaitable[object]], val=function
+        )
 
         @functools.wraps(wrapped=function)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> object:
@@ -111,7 +113,7 @@ def wrap_call[**P, R](
             on_return(arguments=arguments, result=result, duration_ms=elapsed_ms(started=started))
             return result
 
-        return cast(Callable[P, R], async_wrapper)
+        return cast(typ=Callable[P, R], val=async_wrapper)
 
     @functools.wraps(wrapped=function)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -130,4 +132,4 @@ def wrap_call[**P, R](
 
 
 def elapsed_ms(*, started: float) -> float:
-    return round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND, 1)
+    return round(number=(time.perf_counter() - started) * MILLISECONDS_PER_SECOND, ndigits=1)

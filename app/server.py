@@ -1,8 +1,8 @@
 import uvicorn
 from fastapi import FastAPI
 
-from app.config import ServerSettings
-from app.logger import log_debug
+from app.config.server import ServerSettings
+from app.logger.decorators import log_debug
 
 
 @log_debug

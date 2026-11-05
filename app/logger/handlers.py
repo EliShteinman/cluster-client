@@ -2,9 +2,9 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-from app.config import TEXT_ENCODING, ConsoleSettings, FileSettings, FormattingSettings, HandlerSettings
+from app.config.base import TEXT_ENCODING
+from app.config.logging import ConsoleSettings, FileSettings, FormattingSettings, HandlerSettings
 from app.logger.formatters import build_formatter
-from app.logger.tracing import TraceContextFilter
 
 
 def console_handler(*, settings: ConsoleSettings, formatting: FormattingSettings) -> logging.Handler:
@@ -32,5 +32,4 @@ def prepare_handler(
 ) -> logging.Handler:
     handler.setLevel(level=settings.level)
     handler.setFormatter(fmt=build_formatter(log_format=settings.format, settings=formatting))
-    handler.addFilter(filter=TraceContextFilter())
     return handler

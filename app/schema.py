@@ -1,3 +1,4 @@
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 import json
 from pathlib import Path
 
@@ -5,9 +6,9 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError, best_match
 from pydantic import JsonValue
 
-from app.config import TEXT_ENCODING
+from app.config.base import TEXT_ENCODING
 from app.errors import ResponseRejectedError, SchemaLoadError
-from app.logger import log_debug, log_info
+from app.logger.decorators import log_debug, log_info
 
 
 @log_info(inputs=("path",))

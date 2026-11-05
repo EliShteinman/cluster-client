@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, Request, Response
 from jsonschema import Draft202012Validator
 
 from app.cluster_client import send_to_cluster
-from app.config import Settings
+from app.config.settings import Settings
 from app.errors import RequestFailedError
-from app.failures import failure_response, record_failure
+from app.failures.log import record_failure
+from app.failures.response import failure_response
 from app.field_paths import FieldPath
-from app.logger import log_debug, log_info
+from app.logger.decorators import log_debug, log_info
 from app.models import ClusterRequest, ClusterResponse
 from app.response_builder import build_response
 from app.routes.read_request import read_body, read_cluster_request
@@ -29,9 +30,7 @@ def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(depende
     )
     cluster_response: ClusterResponse | None = None
     try:
-        cluster_response = send_to_cluster(
-            request=cluster_request, settings=settings.forwarding, tracing=settings.tracing
-        )
+        cluster_response = send_to_cluster(request=cluster_request, settings=settings.forwarding)
         cluster_response = build_response(
             cluster_response=cluster_response, schema=schema, ignored_fields=ignored_fields
         )

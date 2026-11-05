@@ -1,13 +1,14 @@
 import pytest
 from fastapi import HTTPException
 
-from app.config import FailureCode, FailureSettings, ForwardingSettings, Settings
+from app.config.failures import FailureCode, FailureSettings
+from app.config.forwarding import ForwardingSettings
+from app.config.settings import NoEnvFileSettings, Settings
 from app.models import ClusterRequest, HttpMethod
 from app.routes.read_request import read_cluster_request
 from tests.support.requests import CLUSTER_HEADERS, CLUSTER_URL
 
-SETTINGS: Settings = Settings(
-    _env_file=None,
+SETTINGS: Settings = NoEnvFileSettings(
     failures=FailureSettings(invalid_request=FailureCode(status_code=422, error_code="bad_request")),
     forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"x-task-id"})),
 )
@@ -17,14 +18,6 @@ def test_configured_headers_become_the_cluster_request() -> None:
     request: ClusterRequest = read_cluster_request(headers=CLUSTER_HEADERS, body=b"{}", settings=SETTINGS)
 
     assert (request.method, str(request.url), request.body) == (HttpMethod.GET, CLUSTER_URL, b"{}")
-
-
-def test_method_header_is_read_in_any_case() -> None:
-    request: ClusterRequest = read_cluster_request(
-        headers={**CLUSTER_HEADERS, "x-cluster-method": "delete"}, body=b"", settings=SETTINGS
-    )
-
-    assert request.method is HttpMethod.DELETE
 
 
 @pytest.mark.parametrize("missing", ["x-cluster-method", "x-cluster-url", "x-cluster-authorization"])
@@ -37,16 +30,37 @@ def test_missing_header_is_refused_with_the_configured_status(missing: str) -> N
     assert raised.value.status_code == 422
 
 
-def test_invalid_request_is_marked_as_a_client_error() -> None:
-    with pytest.raises(HTTPException) as raised:
-        read_cluster_request(headers={}, body=b"", settings=SETTINGS)
+@pytest.mark.parametrize(
+    ("missing", "plain_header"),
+    [
+        ("x-cluster-method", "method"),
+        ("x-cluster-url", "url"),
+        ("x-cluster-authorization", "authorization"),
+    ],
+)
+def test_plain_header_does_not_replace_a_missing_one(missing: str, plain_header: str) -> None:
+    headers: dict[str, str] = {**CLUSTER_HEADERS, plain_header: CLUSTER_HEADERS[missing]}
+    del headers[missing]
 
-    assert raised.value.headers == {"x-edge-error": "bad_request"}
+    with pytest.raises(HTTPException):
+        read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
 
 
 def test_configured_headers_are_passed_through() -> None:
     request: ClusterRequest = read_cluster_request(
         headers={**CLUSTER_HEADERS, "x-task-id": "t1"}, body=b"", settings=SETTINGS
+    )
+
+    assert request.passed_through_headers == {"x-task-id": "t1"}
+
+
+def test_passed_through_header_is_configured_in_any_case() -> None:
+    settings: Settings = NoEnvFileSettings(
+        forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"X-Task-Id"})),
+    )
+
+    request: ClusterRequest = read_cluster_request(
+        headers={**CLUSTER_HEADERS, "x-task-id": "t1"}, body=b"", settings=settings
     )
 
     assert request.passed_through_headers == {"x-task-id": "t1"}

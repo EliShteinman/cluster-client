@@ -1,6 +1,6 @@
 import logging
 
-from app.config import LoggingSettings
+from app.config.logging import LoggingSettings
 from app.logger.handlers import console_handler, file_handler
 
 _installed: list[tuple[logging.Logger, logging.Handler]] = []

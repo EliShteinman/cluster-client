@@ -8,7 +8,7 @@ from app.config.failures import FailureSettings
 from app.config.forwarding import ForwardingSettings
 from app.config.logging import LoggingSettings
 from app.config.server import ApplicationSettings, ServerSettings
-from app.config.tracing import TracingSettings
+from app.config.telemetry import TelemetrySettings
 from app.config.validation import ValidationSettings
 
 
@@ -21,4 +21,8 @@ class Settings(EnvironmentSettings):
     forwarding: ForwardingSettings = Field(default_factory=ForwardingSettings)
     failures: FailureSettings = Field(default_factory=FailureSettings)
     log: LoggingSettings = Field(default_factory=LoggingSettings)
-    tracing: TracingSettings = Field(default_factory=TracingSettings)
+    telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
+
+
+class NoEnvFileSettings(Settings):
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_file=None)

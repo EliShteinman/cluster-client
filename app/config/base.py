@@ -16,7 +16,12 @@ def to_upper(value: object) -> object:
     return value.upper() if isinstance(value, str) else value
 
 
+def to_lower(value: object) -> object:
+    return value.lower() if isinstance(value, str) else value
+
+
 type HeaderName = Annotated[str, Field(pattern=HTTP_HEADER_NAME_PATTERN)]
+type LowercaseHeaderName = Annotated[HeaderName, BeforeValidator(func=to_lower)]
 type LogLevel = Annotated[
     Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], BeforeValidator(func=to_upper)
 ]

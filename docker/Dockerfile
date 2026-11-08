@@ -1,12 +1,12 @@
 ARG PYTHON_IMAGE=python:3.14.7-slim
 
-# stage 1: install uv, then the app and its locked dependencies into /app/.venv
+# stage 1: install uv, then the app and its dependencies into /app/.venv
 FROM ${PYTHON_IMAGE} AS builder
 RUN pip install --no-cache-dir uv==0.12.17
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 COPY app ./app
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --no-dev --no-editable
 
 # stage 2: the same python image, with only the installed app copied in
 FROM ${PYTHON_IMAGE}

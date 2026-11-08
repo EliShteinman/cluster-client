@@ -1,6 +1,5 @@
 *
 !pyproject.toml
-!uv.lock
 !app/
 !docker/entrypoint.py
 **/__pycache__

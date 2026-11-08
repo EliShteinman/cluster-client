@@ -29,7 +29,7 @@ dev = [
     "import-linter>=2",
     "pre-commit>=4",
     "pytest>=8",
-    "ruff>=0.17",
+    "ruff>=0.15.14",
 ]
 
 [tool.hatch.build.targets.wheel]

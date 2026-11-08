@@ -1,6 +1,8 @@
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.logging import LoggingInstrumentor  # pyright: ignore[reportMissingTypeStubs]
+from opentelemetry.instrumentation.logging import (  # pyright: ignore[reportMissingTypeStubs]
+    LoggingInstrumentor,
+)
 from opentelemetry.instrumentation.propagators import (
     TraceResponsePropagator,
     set_global_response_propagator,  # pyright: ignore[reportUnknownVariableType]

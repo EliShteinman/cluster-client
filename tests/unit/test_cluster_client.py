@@ -6,18 +6,13 @@ from urllib3.exceptions import ProtocolError
 from app.cluster_client import outgoing_headers, returned_headers, send_to_cluster
 from app.config.forwarding import ForwardingSettings
 from app.errors import ClusterUnreachableError, ConnectionFailedError, NoResponseError
-from app.models import ClusterRequest, ClusterResponse
+from app.models import ClusterRequest, ClusterResponse, HttpMethod
 from tests.support.fake_cluster_api import CONNECT_FAILURE, FakeClusterApi, SentRequest
-from tests.support.requests import CLUSTER_HEADERS, CLUSTER_REQUEST, CLUSTER_URL
+from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
 
 FORWARDING: ForwardingSettings = ForwardingSettings()
-FULL_REQUEST: ClusterRequest = ClusterRequest.model_validate(
-    obj={
-        **CLUSTER_HEADERS,
-        "x-cluster-method": "POST",
-        "content-type": "application/json",
-        "body": b"{}",
-    }
+FULL_REQUEST: ClusterRequest = CLUSTER_REQUEST.model_copy(
+    update={"method": HttpMethod.POST, "content_type": "application/json", "body": b"{}"}
 )
 
 

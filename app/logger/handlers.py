@@ -2,12 +2,12 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-from app.config.base import TEXT_ENCODING
-from app.config.logging import ConsoleSettings, FileSettings, FormattingSettings, HandlerSettings
+from app.config.constants import TEXT_ENCODING
+from app.config.logging import FileSettings, FormattingSettings, HandlerSettings
 from app.logger.formatters import build_formatter
 
 
-def console_handler(*, settings: ConsoleSettings, formatting: FormattingSettings) -> logging.Handler:
+def console_handler(*, settings: HandlerSettings, formatting: FormattingSettings) -> logging.Handler:
     return prepare_handler(
         handler=logging.StreamHandler(stream=sys.stdout), settings=settings, formatting=formatting
     )

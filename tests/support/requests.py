@@ -6,4 +6,6 @@ CLUSTER_HEADERS: dict[str, str] = {
     "x-cluster-url": CLUSTER_URL,
     "x-cluster-authorization": "Basic abc",
 }
-CLUSTER_REQUEST: ClusterRequest = ClusterRequest.model_validate(obj=CLUSTER_HEADERS)
+CLUSTER_REQUEST: ClusterRequest = ClusterRequest.model_validate(
+    obj={"method": "GET", "url": CLUSTER_URL, "authorization": CLUSTER_HEADERS["x-cluster-authorization"]}
+)

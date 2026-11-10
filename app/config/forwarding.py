@@ -1,9 +1,10 @@
 from pydantic import Field, PositiveFloat
 
-from app.config.base import FrozenModel, HeaderName, LowercaseHeaderName
+from app.config.base import BaseConfig
+from app.config.field_types import HeaderName, LowercaseHeaderName
 
 
-class ForwardingSettings(FrozenModel):
+class ForwardingSettings(BaseConfig):
     connect_timeout_seconds: PositiveFloat = Field(default=5.0)
     timeout_seconds: PositiveFloat = Field(default=28.0)
     authorization_header: HeaderName = Field(default="authorization")

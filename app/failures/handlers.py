@@ -4,11 +4,11 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from app.config.base import TEXT_ENCODING
 from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import Settings
+from app.failures.response import own_answer
 from app.logger.decorators import log_debug
-from app.models import FailureBody
+from app.models import ClusterResponse, FailureBody
 
 
 @log_debug
@@ -27,11 +27,5 @@ def internal_error_response(request: Request, error: Exception) -> Response:
     code: FailureCode = settings.failures.internal_error
     body: FailureBody = FailureBody(error=code.error_code, reason=type(error).__name__)
     logging.getLogger(name=settings.log.failure_file.logger_name).error(msg=f"{body.error}: {body.reason}")
-    return Response(
-        content=body.model_dump_json(exclude_none=True).encode(encoding=TEXT_ENCODING),
-        status_code=code.status_code,
-        headers={
-            settings.forwarding.content_type_header: settings.failures.content_type,
-            settings.failures.error_header: code.error_code,
-        },
-    )
+    answer: ClusterResponse = own_answer(code=code, body=body, settings=settings)
+    return Response(content=answer.content, status_code=answer.status_code, headers=answer.headers)

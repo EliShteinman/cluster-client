@@ -3,7 +3,7 @@ import logging
 
 from pydantic import JsonValue
 
-from app.config.base import TEXT_ENCODING
+from app.config.constants import TEXT_ENCODING
 from app.config.failures import FailureSettings
 from app.config.settings import Settings
 from app.errors import RequestFailedError

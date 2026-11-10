@@ -2,29 +2,40 @@ import json
 
 import pytest
 from jsonschema import Draft202012Validator
+from pydantic import JsonValue
 
 from app.errors import ResponseRejectedError
 from app.field_paths import FieldPath
 from app.models import ClusterResponse
 from app.response_builder import build_response
-from tests.support.schemas import DATABASE_SCHEMA
+from app.rules import ResponseRules
 
+DATABASE_SCHEMA: dict[str, JsonValue] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {"uid": {"type": "integer"}, "name": {"type": "string"}},
+    "required": ["uid"],
+    "additionalProperties": False,
+}
 SCHEMA: Draft202012Validator = Draft202012Validator(schema=DATABASE_SCHEMA)
 IGNORE_INTERNAL: tuple[FieldPath, ...] = (("internal",),)
+
+
+def rules_ignoring(*, ignored_fields: tuple[FieldPath, ...]) -> ResponseRules:
+    return ResponseRules(schema_validator=SCHEMA, ignored_fields=ignored_fields, redacted_fields=())
 
 
 def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> ClusterResponse:
     return build_response(
         cluster_response=ClusterResponse(status_code=200, headers={"x-cluster": "1"}, content=content),
-        schema=SCHEMA,
-        ignored_fields=ignored_fields,
+        rules=rules_ignoring(ignored_fields=ignored_fields),
     )
 
 
 def test_empty_body_is_returned_as_is() -> None:
     empty: ClusterResponse = ClusterResponse(status_code=204)
 
-    assert build_response(cluster_response=empty, schema=SCHEMA, ignored_fields=()) is empty
+    assert build_response(cluster_response=empty, rules=rules_ignoring(ignored_fields=())) is empty
 
 
 def test_valid_body_is_returned_byte_for_byte() -> None:

@@ -1,20 +1,19 @@
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
-import json
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError, best_match
 from pydantic import JsonValue
 
-from app.config.base import TEXT_ENCODING
 from app.errors import ResponseRejectedError, SchemaLoadError
+from app.json_file import read_json_file
 from app.logger.decorators import log_debug, log_info
 
 
 @log_info(inputs=("path",))
 @log_debug
 def load_schema(*, path: Path) -> Draft202012Validator:
-    schema: JsonValue = read_schema_file(path=path)
+    schema: JsonValue = read_json_file(path=path, error=SchemaLoadError)
     if not isinstance(schema, dict):
         raise SchemaLoadError(path=path, reason="the schema must be a JSON object")
     try:
@@ -22,14 +21,6 @@ def load_schema(*, path: Path) -> Draft202012Validator:
     except SchemaError as error:
         raise SchemaLoadError(path=path, reason=error.message) from error
     return Draft202012Validator(schema=schema)
-
-
-@log_debug
-def read_schema_file(*, path: Path) -> JsonValue:
-    try:
-        return json.loads(s=path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError) as error:
-        raise SchemaLoadError(path=path, reason=str(error)) from error
 
 
 @log_debug

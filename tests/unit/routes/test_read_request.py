@@ -1,8 +1,12 @@
+from typing import cast
+
 import pytest
 from fastapi import HTTPException
+from pydantic_core import ErrorDetails
 
 from app.config.failures import FailureCode, FailureSettings
 from app.config.forwarding import ForwardingSettings
+from app.config.headers import HeaderSettings
 from app.config.settings import NoEnvFileSettings, Settings
 from app.models import ClusterRequest, HttpMethod
 from app.routes.read_request import read_cluster_request
@@ -30,20 +34,28 @@ def test_missing_header_is_refused_with_the_configured_status(missing: str) -> N
     assert raised.value.status_code == 422
 
 
-@pytest.mark.parametrize(
-    ("missing", "plain_header"),
-    [
-        ("x-cluster-method", "method"),
-        ("x-cluster-url", "url"),
-        ("x-cluster-authorization", "authorization"),
-    ],
-)
-def test_plain_header_does_not_replace_a_missing_one(missing: str, plain_header: str) -> None:
-    headers: dict[str, str] = {**CLUSTER_HEADERS, plain_header: CLUSTER_HEADERS[missing]}
-    del headers[missing]
+def test_refusal_names_the_missing_header() -> None:
+    headers: dict[str, str] = {
+        name: value for name, value in CLUSTER_HEADERS.items() if name != "x-cluster-url"
+    }
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(HTTPException) as raised:
         read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
+
+    details: list[ErrorDetails] = cast(typ=list[ErrorDetails], val=raised.value.detail)
+    assert [detail["loc"] for detail in details] == [("x-cluster-url",)]
+
+
+def test_header_names_come_from_the_given_settings() -> None:
+    settings: Settings = NoEnvFileSettings(headers=HeaderSettings(method="X-Verb"))
+    headers: dict[str, str] = {**CLUSTER_HEADERS, "x-verb": "POST"}
+    del headers["x-cluster-method"]
+
+    assert read_cluster_request(headers=headers, body=b"", settings=settings).method == HttpMethod.POST
+
+
+def test_every_header_setting_names_a_request_field() -> None:
+    assert set(HeaderSettings.model_fields) <= set(ClusterRequest.model_fields)
 
 
 def test_configured_headers_are_passed_through() -> None:

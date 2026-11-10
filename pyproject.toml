@@ -18,7 +18,7 @@ dependencies = [
     "opentelemetry-instrumentation-requests>=0.49b0",
     "opentelemetry-sdk>=1.28.0",
     "pydantic>=2.12",
-    "pydantic-settings>=2.2",
+    "pydantic-settings>=2.5",
     "requests>=2.32",
     "uvicorn>=0.29",
 ]
@@ -69,8 +69,21 @@ layers = [
     "main | server",
     "routes",
     "failures | response_builder | cluster_client | telemetry",
+    "rules",
     "schema | field_paths",
-    "models",
+    "models | json_file",
     "logger",
     "errors | config",
+]
+
+[[tool.importlinter.contracts]]
+name = "config layers"
+type = "layers"
+containers = ["app.config"]
+exhaustive = true
+layers = [
+    "settings",
+    "server | headers | forwarding | validation | failures | logging | telemetry",
+    "base | field_types",
+    "constants | utils",
 ]

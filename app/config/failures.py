@@ -1,14 +1,15 @@
 from pydantic import Field
 
-from app.config.base import ErrorStatusCode, FrozenModel, HeaderName
+from app.config.base import BaseConfig
+from app.config.field_types import ErrorStatusCode, HeaderName
 
 
-class FailureCode(FrozenModel):
+class FailureCode(BaseConfig):
     status_code: ErrorStatusCode
     error_code: str
 
 
-class FailureSettings(FrozenModel):
+class FailureSettings(BaseConfig):
     invalid_request: FailureCode = Field(default=FailureCode(status_code=400, error_code="invalid_request"))
     rejected: FailureCode = Field(default=FailureCode(status_code=502, error_code="response_rejected"))
     connection_failed: FailureCode = Field(

@@ -1,13 +1,9 @@
-import json
 from io import BytesIO
 
 import requests
-from pydantic import JsonValue
 from requests.structures import CaseInsensitiveDict
 from urllib3 import HTTPConnectionPool
 from urllib3.exceptions import MaxRetryError
-
-from app.config.base import TEXT_ENCODING
 
 CONNECT_FAILURE: MaxRetryError = MaxRetryError(
     pool=HTTPConnectionPool(host="cluster"), url="/", reason=ConnectionRefusedError("refused")
@@ -15,12 +11,9 @@ CONNECT_FAILURE: MaxRetryError = MaxRetryError(
 
 
 class SentRequest:
-    def __init__(
-        self, *, method: str, url: str, headers: dict[str, str], data: bytes, allow_redirects: bool
-    ) -> None:
+    def __init__(self, *, method: str, url: str, data: bytes, allow_redirects: bool) -> None:
         self.method: str = method
         self.url: str = url
-        self.headers: CaseInsensitiveDict[str] = CaseInsensitiveDict(data=headers)
         self.content: bytes = data
         self.allow_redirects: bool = allow_redirects
 
@@ -28,29 +21,7 @@ class SentRequest:
 class FakeClusterApi:
     def __init__(self) -> None:
         self.requests: list[SentRequest] = []
-        self._status_code: int = 200
-        self._headers: dict[str, str] = {}
-        self._content: bytes = b'{"uid":1}'
         self._error: requests.RequestException | None = None
-
-    def respond_with_json(
-        self, *, status_code: int, body: JsonValue, headers: dict[str, str] | None = None
-    ) -> None:
-        self.respond_with_content(
-            status_code=status_code,
-            content=json.dumps(obj=body, separators=(",", ":")).encode(encoding=TEXT_ENCODING),
-            headers=headers,
-        )
-
-    def respond_with_content(
-        self, *, status_code: int, content: bytes, headers: dict[str, str] | None = None
-    ) -> None:
-        self._status_code = status_code
-        self._content = content
-        self._headers = headers or {}
-
-    def go_offline(self) -> None:
-        self.fail_with(error=requests.ConnectionError(CONNECT_FAILURE))
 
     def fail_with(self, *, error: requests.RequestException) -> None:
         self._error = error
@@ -66,13 +37,11 @@ class FakeClusterApi:
         allow_redirects: bool,
         verify: bool,
     ) -> requests.Response:
-        self.requests.append(
-            SentRequest(method=method, url=url, headers=headers, data=data, allow_redirects=allow_redirects)
-        )
+        self.requests.append(SentRequest(method=method, url=url, data=data, allow_redirects=allow_redirects))
         if self._error is not None:
             raise self._error
         response: requests.Response = requests.Response()
-        response.status_code = self._status_code
-        response.headers = CaseInsensitiveDict(data=self._headers)
-        response.raw = BytesIO(initial_bytes=self._content)
+        response.status_code = 200
+        response.headers = CaseInsensitiveDict()
+        response.raw = BytesIO(initial_bytes=b'{"uid":1}')
         return response

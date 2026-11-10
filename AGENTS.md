@@ -46,20 +46,22 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 
 | File | Contents |
 |---|---|
-| `app/main.py` | `create_app(settings)` (factory) and `lifespan` (startup: configure logging, start telemetry, load schema, ignored and redacted fields into `app.state`) |
+| `app/main.py` | `create_app(settings)` (factory: builds the app's `TracerProvider`, `FastAPIInstrumentor`) and `lifespan` (startup: configure logging, start telemetry, load the `ResponseRules` into `app.state.rules`; shutdown: stop telemetry) |
 | `app/server.py` | `serve()` → `uvicorn.run` |
-| `app/telemetry.py` | `build_tracer_provider`, `start_telemetry`: OpenTelemetry for `requests` and logs. `FastAPIInstrumentor` is applied in `create_app` |
-| `app/config/` | **every** setting, one file per section: `base.py` (`FrozenModel`, `EnvironmentSettings`, `TEXT_ENCODING`, field types), `server.py`, `headers.py`, `forwarding.py`, `validation.py` (schema, ignored and redacted field files), `failures.py`, `logging.py` (`HandlerSettings` → console / file → failure file), `telemetry.py`, `settings.py` (root `Settings`, env prefix `CLUSTER_CLIENT_`, nested `__`; `NoEnvFileSettings` ignores `.env`) |
-| `app/models.py` | `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
+| `app/telemetry.py` | `build_tracer_provider` (one per app, never global), `start_telemetry` / `stop_telemetry`: instrument and uninstrument `requests` and logs |
+| `app/config/` | **every** setting. Import order `constants` → `utils` → `field_types` → `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the one `BaseSettings` every config class extends; frozen, env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`), one file per section (`server.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`; `NoEnvFileSettings` ignores `.env`) |
+| `app/models.py` | `FrozenModel` (base of the data models), `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
 | `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
 | `app/routes/cluster_routes.py` | `POST /` orchestrator |
-| `app/routes/read_request.py` | `read_body` (async, see below) and `read_cluster_request` |
+| `app/routes/read_request.py` | `read_body` (async, see below), `read_cluster_request`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
 | `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |
-| `app/response_builder.py` | `build_response`, `decode_body`, `encode_body` |
+| `app/response_builder.py` | `build_response(cluster_response, rules)` |
+| `app/rules.py` | `ResponseRules` (schema validator, ignored and redacted fields) and `load_rules` |
+| `app/json_file.py` | `read_json_file` (reads a JSON file from `config/`, raises the given `ConfigFileLoadError`) |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
-| `app/schema.py` | `load_schema`, `read_schema_file`, `validate_body` |
-| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`), `handlers.py` (`refused_request_response`, `internal_error_response`) |
+| `app/schema.py` | `load_schema`, `validate_body` |
+| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `own_answer`: every answer the service writes itself), `handlers.py` (`refused_request_response`, `internal_error_response`) |
 | `app/logger/formatters.py` | JSON + line formatters |
 | `app/logger/handlers.py` | terminal / file handlers |
 | `app/logger/setup.py` | `configure_logging`, `reset_logging` |
@@ -75,7 +77,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
    calls where possible. Only framework-fixed signatures stay positional (ASGI `__call__`, `logging.Filter.filter`,
    `Formatter.format`, middleware `__init__(app, ...)`, exception handlers). Tests and fixtures are exempt from the `*`.
 2. **Type hints on everything**, including local variables (`x: int = ...`).
-3. **Pydantic only** for data (no dataclasses). Models extend `FrozenModel`.
+3. **Pydantic only** for data (no dataclasses). Models extend `FrozenModel`, config classes `BaseConfig`.
 4. **Logging by decorator**: every function gets `@log_debug` (all arguments in, result or error out). Key steps
    also get `@log_info(inputs=(...), outputs=(...))`. Write a log call by hand only when the message needs data from
    inside the function (only the failure WARNING does this). **Exception:** functions whose arguments or result
@@ -98,9 +100,16 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   Only two things stay `async` because the libraries demand it: `lifespan` and `read_body`
   (Starlette reads the raw body only asynchronously; a `bytes` Body parameter would be JSON-parsed instead).
 - **`verify=False`** to the clusters is intentional (internal certificates). Do not "fix" it.
-- **Header names → model via aliases**: `ClusterRequest` fields use `validation_alias` read from `HeaderSettings`
-  at import time (`HEADER_NAMES` in `models.py`). So header names come from ENV/`.env` only, not from the
-  `Settings` passed to `create_app`.
+- **No `uv.lock` in git**: the lock stores every package's index URL, and the company network installs from a
+  different artifactory than pypi.org, so one lock cannot work in both. Each place resolves `pyproject.toml`
+  against its own index; run `uv sync` once after cloning (pre-commit uses `uv run --frozen`).
+- **Config defaults** (pydantic-settings `nested_model_default_partial_update`): a class used once has its
+  defaults on its fields and its parent uses `default_factory`; a shape used several times (`FailureCode`,
+  `HandlerSettings` → `FileSettings` → `FailureFileSettings`) has none, and its parent gives a full instance.
+  One ENV value (`CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE`) keeps the other defaults.
+- **Header names are `settings.headers`**: each `HeaderSettings` field names the header that carries the
+  `ClusterRequest` field of the same name; `read_cluster_request` maps them and a refusal names the header
+  (`loc: ["x-cluster-url"]`). Env names: `CLUSTER_CLIENT_HEADERS__*`.
 - **`authorization` is required** (no request may reach a cluster without credentials).
 - **Response headers**: all cluster headers are returned except `recomputed_response_headers` (content-length,
   content-encoding, transfer-encoding, connection). uvicorn's own `date`/`server` headers are off.

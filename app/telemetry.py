@@ -1,4 +1,3 @@
-from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.logging import (  # pyright: ignore[reportMissingTypeStubs]
     LoggingInstrumentor,
@@ -28,12 +27,16 @@ def build_tracer_provider(*, settings: TelemetrySettings) -> TracerProvider:
 
 
 @log_debug
-def start_telemetry(*, settings: TelemetrySettings) -> TracerProvider:
-    provider: TracerProvider = build_tracer_provider(settings=settings)
-    trace.set_tracer_provider(tracer_provider=provider)
+def start_telemetry(*, provider: TracerProvider) -> None:
     LoggingInstrumentor().instrument(
         tracer_provider=provider, inject_trace_context=True, enable_log_auto_instrumentation=False
     )
     set_global_response_propagator(propagator=TraceResponsePropagator())
     RequestsInstrumentor().instrument(tracer_provider=provider)
-    return provider
+
+
+@log_debug
+def stop_telemetry(*, provider: TracerProvider) -> None:
+    RequestsInstrumentor().uninstrument()
+    LoggingInstrumentor().uninstrument()
+    provider.shutdown()

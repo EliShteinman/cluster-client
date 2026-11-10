@@ -3,7 +3,8 @@ from pathlib import Path
 
 from pydantic import Field, NonNegativeInt, PositiveInt
 
-from app.config.base import FrozenModel, LogLevel
+from app.config.base import BaseConfig
+from app.config.field_types import LogLevel
 
 
 class LogFormat(StrEnum):
@@ -11,44 +12,53 @@ class LogFormat(StrEnum):
     JSON = "json"
 
 
-class HandlerSettings(FrozenModel):
+class HandlerSettings(BaseConfig):
     enabled: bool
     level: LogLevel
     format: LogFormat
 
 
-class ConsoleSettings(HandlerSettings):
-    enabled: bool = Field(default=True)
-    level: LogLevel = Field(default="INFO")
-    format: LogFormat = Field(default=LogFormat.LINE)
-
-
 class FileSettings(HandlerSettings):
-    enabled: bool = Field(default=False)
-    level: LogLevel = Field(default="DEBUG")
-    format: LogFormat = Field(default=LogFormat.JSON)
-    path: Path = Field(default=Path("logs/app.log"))
-    max_bytes: PositiveInt = Field(default=10 * 1024 * 1024)
-    backup_count: NonNegativeInt = Field(default=5)
+    path: Path
+    max_bytes: PositiveInt
+    backup_count: NonNegativeInt
 
 
 class FailureFileSettings(FileSettings):
-    enabled: bool = Field(default=True)
-    level: LogLevel = Field(default="WARNING")
-    path: Path = Field(default=Path("logs/failures.log"))
-    logger_name: str = Field(default="cluster_client.failures")
+    logger_name: str
 
 
-class FormattingSettings(FrozenModel):
+class FormattingSettings(BaseConfig):
     line_pattern: str = Field(
         default="%(asctime)s | %(levelname)-8s | %(name)s | trace_id=%(otelTraceID)s | %(message)s"
     )
     date_format: str = Field(default="%Y-%m-%dT%H:%M:%S%z")
 
 
-class LoggingSettings(FrozenModel):
+class LoggingSettings(BaseConfig):
     level: LogLevel = Field(default="DEBUG")
-    console: ConsoleSettings = Field(default_factory=ConsoleSettings)
-    file: FileSettings = Field(default_factory=FileSettings)
-    failure_file: FailureFileSettings = Field(default_factory=FailureFileSettings)
+    console: HandlerSettings = Field(
+        default=HandlerSettings(enabled=True, level="INFO", format=LogFormat.LINE)
+    )
+    file: FileSettings = Field(
+        default=FileSettings(
+            enabled=False,
+            level="DEBUG",
+            format=LogFormat.JSON,
+            path=Path("logs/app.log"),
+            max_bytes=10 * 1024 * 1024,
+            backup_count=5,
+        )
+    )
+    failure_file: FailureFileSettings = Field(
+        default=FailureFileSettings(
+            enabled=True,
+            level="WARNING",
+            format=LogFormat.JSON,
+            path=Path("logs/failures.log"),
+            max_bytes=10 * 1024 * 1024,
+            backup_count=5,
+            logger_name="cluster_client.failures",
+        )
+    )
     formatting: FormattingSettings = Field(default_factory=FormattingSettings)

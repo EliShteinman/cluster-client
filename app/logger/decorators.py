@@ -6,7 +6,6 @@ from collections.abc import Awaitable, Callable
 from typing import cast
 
 MILLISECONDS_PER_SECOND: int = 1000
-SELF_PARAMETER: str = "self"
 PATH_SEPARATOR: str = "."
 
 
@@ -28,7 +27,10 @@ def log_debug[**P, R](function: Callable[P, R]) -> Callable[P, R]:
             )
 
     def on_error(*, arguments: dict[str, object], error: Exception, duration_ms: float) -> None:
-        logger.debug(msg=f"{name} raised {error!r} in {duration_ms} ms", extra={"duration_ms": duration_ms})
+        if logger.isEnabledFor(level=logging.DEBUG):
+            logger.debug(
+                msg=f"{name} raised {error!r} in {duration_ms} ms", extra={"duration_ms": duration_ms}
+            )
 
     return wrap_call(function=function, on_call=on_call, on_return=on_return, on_error=on_error)
 
@@ -93,7 +95,7 @@ def wrap_call[**P, R](
     def arguments_of(*args: object, **kwargs: object) -> dict[str, object]:
         bound: inspect.BoundArguments = signature.bind(*args, **kwargs)
         bound.apply_defaults()
-        return {name: value for name, value in bound.arguments.items() if name != SELF_PARAMETER}
+        return dict(bound.arguments)
 
     if inspect.iscoroutinefunction(obj=function):
         coroutine_function: Callable[P, Awaitable[object]] = cast(

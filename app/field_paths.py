@@ -1,12 +1,11 @@
 import copy
-import json
 import re
 from pathlib import Path
 
 from pydantic import JsonValue
 
-from app.config.base import TEXT_ENCODING
 from app.errors import FieldPathsLoadError
+from app.json_file import read_json_file
 from app.logger.decorators import log_debug, log_info
 
 ROOT: str = "$"
@@ -19,10 +18,7 @@ type FieldPath = tuple[str, ...]
 @log_info(inputs=("path",))
 @log_debug
 def load_field_paths(*, path: Path) -> tuple[FieldPath, ...]:
-    try:
-        paths: JsonValue = json.loads(s=path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError) as error:
-        raise FieldPathsLoadError(path=path, reason=str(error)) from error
+    paths: JsonValue = read_json_file(path=path, error=FieldPathsLoadError)
     fields: list[str] = (
         [field for field in paths if isinstance(field, str)] if isinstance(paths, list) else []
     )

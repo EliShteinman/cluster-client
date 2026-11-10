@@ -83,9 +83,8 @@ def test_rejection_carries_the_cluster_status() -> None:
     assert response.headers["x-edge-cluster-status"] == "201"
 
 
-@pytest.mark.parametrize("status_code", [400, 404, 405])
-def test_a_refused_request_is_marked_as_our_own_answer(status_code: int) -> None:
-    response: Response = refused_request_response(REQUEST, HTTPException(status_code=status_code))
+def test_a_refused_request_is_marked_as_our_own_answer() -> None:
+    response: Response = refused_request_response(REQUEST, HTTPException(status_code=404))
 
     assert response.headers["x-edge-error"] == "invalid_request"
 

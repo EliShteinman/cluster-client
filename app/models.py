@@ -1,12 +1,13 @@
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
-from pydantic import BeforeValidator, Field, HttpUrl, SecretStr
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, HttpUrl, SecretStr
 
-from app.config.base import FrozenModel, to_upper
-from app.config.headers import HeaderSettings
+from app.config.utils import to_upper
 
-HEADER_NAMES: HeaderSettings = HeaderSettings()
+
+class FrozenModel(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
 
 class HttpMethod(StrEnum):
@@ -18,12 +19,10 @@ class HttpMethod(StrEnum):
 
 
 class ClusterRequest(FrozenModel):
-    method: Annotated[HttpMethod, BeforeValidator(func=to_upper)] = Field(
-        validation_alias=HEADER_NAMES.method.lower()
-    )
-    url: HttpUrl = Field(validation_alias=HEADER_NAMES.url.lower())
-    authorization: SecretStr = Field(min_length=1, validation_alias=HEADER_NAMES.authorization.lower())
-    content_type: str | None = Field(default=None, validation_alias=HEADER_NAMES.content_type.lower())
+    method: Annotated[HttpMethod, BeforeValidator(func=to_upper)]
+    url: HttpUrl
+    authorization: SecretStr = Field(min_length=1)
+    content_type: str | None = Field(default=None)
     passed_through_headers: dict[str, str] = Field(default_factory=dict)
     body: bytes = Field(default=b"")
 

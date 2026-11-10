@@ -1,0 +1,15 @@
+{
+  "body": {
+    "action_uid": "8220fff2-8b4a-49c3-8754-0f9fa094d544",
+    "creation_time": "1792936979",
+    "heartbeat": "1792936984",
+    "name": "update_redis_acls",
+    "owner_node_uid": "1",
+    "progress": "100",
+    "status": "completed",
+    "task_id": "8220fff2-8b4a-49c3-8754-0f9fa094d544"
+  },
+  "method": "GET",
+  "path": "/v1/actions/8220fff2-8b4a-49c3-8754-0f9fa094d544",
+  "status": 200
+}

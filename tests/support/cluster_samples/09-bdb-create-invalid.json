@@ -1,0 +1,9 @@
+{
+  "body": {
+    "description": "'big' does not match the 'memory_size' field type: integer",
+    "error_code": "invalid_schema"
+  },
+  "method": "POST",
+  "path": "/v1/bdbs",
+  "status": 400
+}

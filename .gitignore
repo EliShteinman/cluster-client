@@ -9,3 +9,4 @@ logs/
 .idea/
 _to_delete/
 CONVERSATION.md
+uv.lock

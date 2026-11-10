@@ -1,0 +1,11 @@
+from pydantic import Field
+
+from app.config.base import BaseConfig
+from app.config.constants import DISTRIBUTION_NAME
+
+
+class TelemetrySettings(BaseConfig):
+    service_name: str = Field(default=DISTRIBUTION_NAME)
+    export_enabled: bool = Field(default=False)
+    otlp_endpoint: str = Field(default="http://localhost:4318", pattern=r"[^/]$")
+    traces_path: str = Field(default="/v1/traces", pattern=r"^/")

@@ -167,7 +167,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 
 - A question ("why…?", "what is…?") is **not** a request to change code. Answer, propose, wait for "yes".
 - **Never commit** unless explicitly asked. Conventional Commits; single branch `main`.
-- Do not redraw diagrams unless asked; if code changes make them stale, say so.
+- When code changes make `docs/diagrams/` stale, update the diagrams in the same task (edit cells in place, keep the
+  layout, render to check); do not touch them for changes they do not show.
 - Keep answers short; the owner writes in Hebrew.
 
 ## Open items (do not implement without the owner)

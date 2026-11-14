@@ -3,6 +3,7 @@ import json
 from pydantic import JsonValue
 
 from app.config.constants import TEXT_ENCODING
+from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
 from app.field_paths import ROOT, remove_fields
 from app.logger.decorators import log_debug
@@ -12,15 +13,24 @@ from app.schema import validate_body
 
 
 @log_debug
-def build_response(*, cluster_response: ClusterResponse, rules: ResponseRules) -> ClusterResponse:
+def build_response(
+    *, cluster_response: ClusterResponse, rules: ResponseRules, settings: FailureSettings
+) -> ClusterResponse:
     if not cluster_response.content:
         return cluster_response
     try:
         body: JsonValue = json.loads(s=cluster_response.content)
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
-        raise ResponseRejectedError(field=ROOT, reason=f"the response body is not JSON: {error}") from error
+        raise ResponseRejectedError(
+            rule=settings.not_json_rule, field=ROOT, reason=settings.not_json_reason.format(error=error)
+        ) from error
     cleaned: JsonValue = remove_fields(body=body, field_paths=rules.ignored_fields)
-    validate_body(body=cleaned, schema=rules.schema_validator)
+    validate_body(
+        body=cleaned,
+        schema=rules.schema_validator,
+        redacted_fields=rules.redacted_fields,
+        redacted_reason=settings.redacted_reason,
+    )
     if cleaned == body:
         return cluster_response
     return cluster_response.model_copy(

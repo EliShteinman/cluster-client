@@ -373,6 +373,28 @@
         "CLUSTER_CLIENT_FAILURES__CONTENT_TYPE": {
           "$ref": "#/$defs/mediaType"
         },
+        "CLUSTER_CLIENT_FAILURES__PART_LENGTH": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "CLUSTER_CLIENT_FAILURES__MAX_PARTS": {
+          "type": "string",
+          "pattern": "^([2-9]|[1-9][0-9]+)$"
+        },
+        "CLUSTER_CLIENT_FAILURES__SHORTENED_FIELD_PREFIX": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_FAILURES__UNSENT_CHARACTERS_MESSAGE": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_FAILURES__NOT_JSON_RULE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__NOT_JSON_REASON": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_FAILURES__REDACTED_REASON": {
+          "$ref": "#/$defs/text"
+        },
         "CLUSTER_CLIENT_LOG__LEVEL": {
           "$ref": "#/$defs/logLevel"
         },

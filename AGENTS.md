@@ -28,14 +28,15 @@ one visible call:
    happen after the cluster got the request).
 4. `build_response` (`app/response_builder.py`):
    - empty body (e.g. 204) → returned as is;
-   - decode JSON (not JSON → `ResponseRejectedError`, field `$`);
+   - decode JSON (not JSON → `ResponseRejectedError`, rule `not_json_rule`, field `$`);
    - `remove_fields` (`app/field_paths.py`) removes the configured ignored field paths ("function X");
    - `validate_body` (`app/schema.py`) checks the JSON Schema (violation → `ResponseRejectedError` with the
-     failing field, e.g. `$.uid`);
+     failing `rule` and field, e.g. `$.uid`, and a `reason` built from a copy without the redacted fields);
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
 5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file (redacted
    fields left out of the cluster response), then `failure_response` builds the answer with `x-edge-error`,
-   and on a rejection `x-edge-cluster-status` (`app/failures/`). Anything else the service answers itself goes
+   and on a rejection `x-edge-cluster-status` (`app/failures/`). Both start from the same `failure_details`; the
+   file keeps it whole, only the answer is cut (`failure_body`, `app/failures/reason_parts.py`). Anything else the service answers itself goes
    through the handlers of `app/failures/handlers.py`, so every such answer has `x-edge-error`: `HTTPException`
    (bad headers, wrong path, wrong method) → `invalid_request`; any other exception → `internal_error`.
 6. The route returns status + headers + body; OpenTelemetry adds `traceresponse`.
@@ -50,18 +51,18 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/telemetry.py` | `build_tracer_provider` (one per app, never global), `start_telemetry` / `stop_telemetry`: instrument and uninstrument `requests` and logs |
 | `app/config/` | **every** setting. Import order `constants` → `utils` → `field_types` → `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the one `BaseSettings` every config class extends; frozen, env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`), one file per section (`server.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`; `NoEnvFileSettings` ignores `.env`) |
-| `app/models.py` | `FrozenModel` (base of the data models), `ClusterRequest`, `ClusterResponse`, `FailureBody`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
+| `app/models.py` | `FrozenModel` (base of the data models), `ClusterRequest`, `ClusterResponse`, `FailureBody`, `FailureDetails`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
 | `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
 | `app/routes/cluster_routes.py` | `POST /` orchestrator |
 | `app/routes/read_request.py` | `read_body` (async, see below), `read_cluster_request`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
 | `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |
-| `app/response_builder.py` | `build_response(cluster_response, rules)` |
+| `app/response_builder.py` | `build_response(cluster_response, rules, settings)` |
 | `app/rules.py` | `ResponseRules` (schema validator, ignored and redacted fields) and `load_rules` |
 | `app/json_file.py` | `read_json_file` (reads a JSON file from `config/`, raises the given `ConfigFileLoadError`) |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
-| `app/schema.py` | `load_schema`, `validate_body` |
-| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `own_answer`: every answer the service writes itself), `handlers.py` (`refused_request_response`, `internal_error_response`) |
+| `app/schema.py` | `load_schema`, `validate_body`, `violation_at`, `every_error` |
+| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `failure_details`, `failure_body`, `own_answer`: every answer the service writes itself), `reason_parts.py` (`reason_parts`, `shortened_field`), `handlers.py` (`refused_request_response`, `internal_error_response`) |
 | `app/logger/formatters.py` | JSON + line formatters |
 | `app/logger/handlers.py` | terminal / file handlers |
 | `app/logger/setup.py` | `configure_logging`, `reset_logging` |
@@ -80,7 +81,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 3. **Pydantic only** for data (no dataclasses). Models extend `FrozenModel`, config classes `BaseConfig`.
 4. **Logging by decorator**: every function gets `@log_debug` (all arguments in, result or error out). Key steps
    also get `@log_info(inputs=(...), outputs=(...))`. Write a log call by hand only when the message needs data from
-   inside the function (only the failure WARNING does this). **Exception:** functions whose arguments or result
+   inside the function (the failure WARNING, the `invalid_request` WARNING, the `internal_error` ERROR, and the DEBUG line of `validate_body`
+   with the original schema message). **Exception:** functions whose arguments or result
    contain the cluster password are not decorated (`outgoing_headers`; `read_cluster_request` stays decorated on
    purpose, see below). Also not decorated: `lifespan` (logging
    does not exist yet when it starts, so its lines are lost), `app/logger/`, `app/config/` (the logger imports it),
@@ -132,8 +134,22 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - **DEBUG logs the cluster password** (`read_cluster_request` receives all headers). The owner chose this; do not
   "fix" it. The owner must always have one place with the full error and the whole call: the DEBUG file log
   (`CLUSTER_CLIENT_LOG__FILE__ENABLED=true`, off by default). Never clean a secret without keeping it there.
-- **The rejection `reason` keeps the blocked value**, as jsonschema wrote it, even a password, in the answer to
-  the manager and in the failure file. The owner uses it to see the problem without going to the other network.
+- **Every body the service writes itself passes the firewall schema** (`response-schema-depth.json` in
+  redis-enterprise-services, copied to `tests/support/firewall-response-schema.json`): `{"error", "rule",
+  "field", "reason"}`, `reason` a list of parts of up to `part_length` (512), at most `max_parts` (500), the last
+  one then saying how many characters were not sent; `field` over 512 is cut from the start, `...` included.
+- **The rejection `reason`** (replaces "keeps the blocked value… even a password", owner's decision 2026-11-13,
+  because of the 512-character limit of DataPower): only the `redacted_fields` are removed, from a copy of the
+  body; everything else, even an unknown password, goes out in full. `rule` and `field` always come from the
+  real failure; `reason` comes from the copy's failure at the same path, else it is `redacted_reason`. The
+  original `error.message`, with the password, stays in the DEBUG log (a hand-written line in `validate_body`).
+  `violation_at` looks at every failure of the copy, `anyOf` context included, without `best_match` descending
+  again. No generic fallback: no `except Exception` around building the explanation. `FailureSettings` refuses
+  texts that could not pass the firewall (unknown placeholders, prefix or unsent message too long).
+- **The failure file always has the whole error, never cut** (owner's decision 2026-11-14): every failure the
+  service answers itself (`invalid_request` and `internal_error` included) is written there with the full
+  `reason` and `field`, at WARNING/ERROR, not only at DEBUG. Only the answer is cut to the firewall limits.
+  `internal_error` sends and logs the error and its traceback.
 - **One schema, one set of field files per service.** More technologies later: first change the schema, change
   the logic only if there is no other choice. Non-JSON answers stay rejected, Redis-specific defaults stay.
 
@@ -157,4 +173,3 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 
 - `/health/ready` should check something real.
 - Whether cluster-client should hold a list of known clusters/credentials: `docs/proposals/cluster-health-check.md`.
-- Final shape of the rejection body returned to the manager.

@@ -22,10 +22,11 @@ class FieldPathsLoadError(ConfigFileLoadError):
 
 
 class RequestFailedError(ClusterClientError):
-    def __init__(self, *, reason: str, field: str | None = None) -> None:
+    def __init__(self, *, reason: str, field: str | None = None, rule: str | None = None) -> None:
         super().__init__(reason)
         self.reason: str = reason
         self.field: str | None = field
+        self.rule: str | None = rule
 
 
 class ClusterUnreachableError(RequestFailedError):

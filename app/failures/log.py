@@ -8,9 +8,10 @@ from app.config.failures import FailureSettings
 from app.config.settings import Settings
 from app.errors import RequestFailedError
 from app.failures.codes import failure_code
+from app.failures.response import failure_details
 from app.field_paths import FieldPath, remove_fields
 from app.logger.decorators import log_debug
-from app.models import ClusterRequest, ClusterResponse, RequestFailure
+from app.models import ClusterRequest, ClusterResponse, FailureDetails, RequestFailure
 
 
 @log_debug
@@ -44,12 +45,11 @@ def failure_record(
     redacted_fields: tuple[FieldPath, ...],
     settings: FailureSettings,
 ) -> RequestFailure:
-    record: RequestFailure = RequestFailure(
-        error=failure_code(failure=failure, settings=settings).error_code,
-        reason=failure.reason,
-        field=failure.field,
-        method=request.method,
-        url=str(request.url),
+    details: FailureDetails = failure_details(
+        error_code=failure_code(failure=failure, settings=settings).error_code, failure=failure
+    )
+    record: RequestFailure = RequestFailure.model_validate(
+        obj={**details.model_dump(), "method": request.method, "url": str(request.url)}
     )
     if cluster_response is None:
         return record

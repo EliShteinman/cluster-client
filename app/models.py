@@ -34,12 +34,26 @@ class ClusterResponse(FrozenModel):
 
 
 class FailureBody(FrozenModel):
+    error: str = Field(description="The configured error code, the same as the x-edge-error header")
+    rule: str | None = Field(
+        default=None, description="The JSON Schema keyword that failed, or the not-JSON rule; rejections only"
+    )
+    field: str | None = Field(
+        default=None, description="The failing field; a long path is cut from the start and begins with ..."
+    )
+    reason: list[str] = Field(
+        description="The whole explanation in parts that each fit the firewall; joined, they are the text"
+    )
+
+
+class FailureDetails(FrozenModel):
     error: str
-    reason: str
+    rule: str | None = None
     field: str | None = None
+    reason: str
 
 
-class RequestFailure(FailureBody):
+class RequestFailure(FailureDetails):
     method: HttpMethod
     url: str
     cluster_status_code: int | None = None

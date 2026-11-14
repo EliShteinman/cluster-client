@@ -1,10 +1,11 @@
 from app.config.constants import TEXT_ENCODING
-from app.config.failures import FailureCode
+from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import Settings
 from app.errors import RequestFailedError
 from app.failures.codes import failure_code
+from app.failures.reason_parts import reason_parts, shortened_field
 from app.logger.decorators import log_debug
-from app.models import ClusterResponse, FailureBody
+from app.models import ClusterResponse, FailureBody, FailureDetails
 
 
 @log_debug
@@ -14,7 +15,9 @@ def failure_response(
     code: FailureCode = failure_code(failure=failure, settings=settings.failures)
     answer: ClusterResponse = own_answer(
         code=code,
-        body=FailureBody(error=code.error_code, reason=failure.reason, field=failure.field),
+        body=failure_body(
+            details=failure_details(error_code=code.error_code, failure=failure), settings=settings.failures
+        ),
         settings=settings,
     )
     if cluster_response is None:
@@ -23,6 +26,21 @@ def failure_response(
         settings.failures.cluster_status_header: str(cluster_response.status_code)
     }
     return answer.model_copy(update={"headers": {**answer.headers, **cluster_status}})
+
+
+@log_debug
+def failure_details(*, error_code: str, failure: RequestFailedError) -> FailureDetails:
+    return FailureDetails(error=error_code, rule=failure.rule, field=failure.field, reason=failure.reason)
+
+
+@log_debug
+def failure_body(*, details: FailureDetails, settings: FailureSettings) -> FailureBody:
+    return FailureBody(
+        error=details.error,
+        rule=details.rule,
+        field=shortened_field(field=details.field, settings=settings),
+        reason=reason_parts(text=details.reason, settings=settings),
+    )
 
 
 @log_debug

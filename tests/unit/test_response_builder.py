@@ -4,6 +4,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import JsonValue
 
+from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
 from app.field_paths import FieldPath
 from app.models import ClusterResponse
@@ -29,13 +30,19 @@ def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> Clus
     return build_response(
         cluster_response=ClusterResponse(status_code=200, headers={"x-cluster": "1"}, content=content),
         rules=rules_ignoring(ignored_fields=ignored_fields),
+        settings=FailureSettings(),
     )
 
 
 def test_empty_body_is_returned_as_is() -> None:
     empty: ClusterResponse = ClusterResponse(status_code=204)
 
-    assert build_response(cluster_response=empty, rules=rules_ignoring(ignored_fields=())) is empty
+    assert (
+        build_response(
+            cluster_response=empty, rules=rules_ignoring(ignored_fields=()), settings=FailureSettings()
+        )
+        is empty
+    )
 
 
 def test_valid_body_is_returned_byte_for_byte() -> None:
@@ -48,6 +55,13 @@ def test_non_json_body_is_rejected_at_the_root(content: bytes) -> None:
         build(content=content)
 
     assert raised.value.field == "$"
+
+
+def test_non_json_body_is_rejected_with_the_configured_rule() -> None:
+    with pytest.raises(ResponseRejectedError) as raised:
+        build(content=b"<html>")
+
+    assert raised.value.rule == "not_json"
 
 
 def test_schema_violation_is_rejected_with_the_failing_field() -> None:

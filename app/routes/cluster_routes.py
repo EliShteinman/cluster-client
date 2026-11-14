@@ -28,7 +28,9 @@ def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(depende
     cluster_response: ClusterResponse | None = None
     try:
         cluster_response = send_to_cluster(request=cluster_request, settings=settings.forwarding)
-        cluster_response = build_response(cluster_response=cluster_response, rules=rules)
+        cluster_response = build_response(
+            cluster_response=cluster_response, rules=rules, settings=settings.failures
+        )
     except RequestFailedError as failure:
         record_failure(
             request=cluster_request,

@@ -42,16 +42,29 @@ cluster, and the response carries `traceresponse`. The headers in `CLUSTER_CLIEN
 | Case | Status | `x-edge-error` | Body |
 |---|---|---|---|
 | Answer matches the schema | the cluster's | none | the cluster's, unchanged (with its headers) |
-| Answer is not JSON or breaks the schema | 502 | `response_rejected` | `{"error", "reason", "field"}` |
+| Answer is not JSON or breaks the schema | 502 | `response_rejected` | `{"error", "rule", "field", "reason"}` |
 | Request surely did not reach the cluster (refused, DNS, connect timeout) | 502 | `connection_failed` | `{"error", "reason"}` |
 | Request may have been sent, no full answer (read timeout, connection cut, TLS error) | 504 | `timeout` | `{"error", "reason"}` |
-| A required header is missing or invalid | 400 | `invalid_request` | the validation errors |
-| Wrong path or method on the cluster client | 404, 405 | `invalid_request` | `{"detail"}` |
-| Unexpected error inside the cluster client | 500 | `internal_error` | `{"error", "reason"}` (the error type only) |
+| A required header is missing or invalid | 400 | `invalid_request` | `{"error", "reason"}` (the validation errors) |
+| Wrong path or method on the cluster client | 404, 405 | `invalid_request` | `{"error", "reason"}` |
+| Unexpected error inside the cluster client | 500 | `internal_error` | `{"error", "reason"}` (the error and its traceback) |
 
 `x-edge-error` is on every answer the cluster client made itself, and never on a cluster answer. A
 `response_rejected` answer also carries the cluster's status in `x-edge-cluster-status`. Status codes, error
 codes and header names are set by `CLUSTER_CLIENT_FAILURES__*`.
+
+Every body the cluster client writes itself passes the firewall's response schema:
+
+```json
+{"error": "response_rejected", "rule": "anyOf", "field": "$.shard_list", "reason": ["...", "..."]}
+```
+
+- `rule`: the JSON Schema keyword that failed (`not_json` when the answer is not JSON); rejections only.
+- `field`: the failing field; longer than 512 characters, it is cut from the start and begins with `...`.
+- `reason`: the whole explanation in parts of up to 512 characters; joined, they are the full text. Above 500
+  parts, the last part says how many characters were not sent.
+- The explanation is built after removing the redacted fields, so no listed password reaches it; a failure in a
+  redacted field itself is explained without its value. The original explanation is in the DEBUG log.
 
 Three files are read at startup; replace them without touching the code or the image:
 
@@ -59,7 +72,7 @@ Three files are read at startup; replace them without touching the code or the i
 |---|---|---|
 | `config/response-schema.json` | `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | the JSON Schema every answer must match |
 | `config/ignored-fields.json` | `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | field paths removed before the check |
-| `config/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log (passwords) |
+| `config/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log and of a rejection's explanation (passwords) |
 
 Ignored and redacted fields use the same format as `field` in a rejection, with `[*]` for every item of a list:
 

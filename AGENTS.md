@@ -53,7 +53,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/config/` | **every** setting. Import order `constants` → `utils` → `field_types` → `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the one `BaseSettings` every config class extends; frozen, env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`), one file per section (`server.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`; `NoEnvFileSettings` ignores `.env`) |
 | `app/models.py` | `FrozenModel` (base of the data models), `ClusterRequest`, `ClusterResponse`, `FailureBody`, `FailureDetails`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
 | `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
-| `app/routes/cluster_routes.py` | `POST /` orchestrator |
+| `app/routes/cluster_routes.py` | `build_cluster_router(settings)` and the `POST /` orchestrator `cluster_endpoint` |
+| `app/routes/cluster_openapi.py` | the OpenAPI of `POST /` from the settings: request headers, every failure status with `FailureBody` and its headers |
 | `app/routes/read_request.py` | `read_body` (async, see below), `read_cluster_request`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
 | `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |

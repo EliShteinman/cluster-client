@@ -8,15 +8,27 @@ from app.errors import RequestFailedError
 from app.failures.log import record_failure
 from app.failures.response import failure_response
 from app.logger.decorators import log_debug, log_info
-from app.models import ClusterRequest, ClusterResponse
+from app.models import ClusterRequest, ClusterResponse, HttpMethod
 from app.response_builder import build_response
+from app.routes.cluster_openapi import failure_responses, request_documentation
 from app.routes.read_request import read_body, read_cluster_request
 from app.rules import ResponseRules
 
-cluster_router: APIRouter = APIRouter()
+
+@log_debug
+def build_cluster_router(*, settings: Settings) -> APIRouter:
+    router: APIRouter = APIRouter()
+    router.add_api_route(
+        path="/",
+        endpoint=cluster_endpoint,
+        methods=[HttpMethod.POST],
+        response_description="The cluster's own answer: its status, headers and body, unchanged",
+        responses=failure_responses(settings=settings),
+        openapi_extra=request_documentation(settings=settings),
+    )
+    return router
 
 
-@cluster_router.post(path="/")
 @log_info(outputs=("status_code",))
 @log_debug
 def cluster_endpoint(*, request: Request, body: Annotated[bytes, Depends(dependency=read_body)]) -> Response:

@@ -97,6 +97,9 @@ Real cluster answers, passwords replaced, are kept in `tests/support/cluster_sam
 
 Health probes: `GET /health/live`, `GET /health/ready`.
 
+The OpenAPI description of `POST /` (request headers, every failure status with its body and headers, from the
+settings in use) is served at `/openapi.json` and `/docs`.
+
 ## Logging
 
 | Output | Default | Setting |

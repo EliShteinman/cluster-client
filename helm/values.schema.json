@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": [
     "replicaCount",
+    "domain",
     "image",
     "containerPort",
     "service",
@@ -13,7 +14,7 @@
     "logsSizeLimit",
     "config",
     "secret",
-    "files",
+    "collector",
     "resources"
   ],
   "properties": {
@@ -21,15 +22,22 @@
       "type": "integer",
       "minimum": 1
     },
+    "domain": {
+      "$ref": "#/$defs/optionalHost"
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "registry",
         "repository",
         "tag",
         "pullPolicy"
       ],
       "properties": {
+        "registry": {
+          "$ref": "#/$defs/host"
+        },
         "repository": {
           "type": "string",
           "pattern": "^[a-z0-9]+([._/:-][a-z0-9]+)*$"
@@ -67,13 +75,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "name",
         "host",
         "tls"
       ],
       "properties": {
+        "name": {
+          "$ref": "#/$defs/dnsLabel"
+        },
         "host": {
-          "type": "string",
-          "pattern": "^(([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+          "$ref": "#/$defs/optionalHost"
         },
         "tls": {
           "type": "object",
@@ -126,71 +137,118 @@
       "$ref": "#/$defs/environment"
     },
     "secret": {
-      "$ref": "#/$defs/environment"
+      "allOf": [
+        {
+          "$ref": "#/$defs/environment"
+        },
+        {
+          "required": [
+            "CLUSTER_CLIENT_ACCESS__USERNAME",
+            "CLUSTER_CLIENT_ACCESS__PASSWORD"
+          ]
+        }
+      ]
     },
-    "files": {
+    "collector": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "response-schema.json",
-        "ignored-fields.json",
-        "redacted-fields.json"
+        "enabled",
+        "image",
+        "logLevel",
+        "elasticsearch",
+        "resources"
       ],
       "properties": {
-        "response-schema.json": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
           "type": "object",
+          "additionalProperties": false,
           "required": [
-            "$schema"
-          ]
+            "repository",
+            "tag",
+            "pullPolicy"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+([._/:-][a-z0-9]+)*$"
+            },
+            "tag": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never"
+              ]
+            }
+          }
         },
-        "ignored-fields.json": {
-          "$ref": "#/$defs/fieldPaths"
+        "logLevel": {
+          "$ref": "#/$defs/logLevel"
         },
-        "redacted-fields.json": {
-          "$ref": "#/$defs/fieldPaths"
+        "elasticsearch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "username",
+            "password",
+            "insecureSkipVerify"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "pattern": "^(https?://[^\\s]+)?$"
+            },
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "insecureSkipVerify": {
+              "type": "boolean"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "elasticsearch": {
+            "properties": {
+              "endpoint": {
+                "minLength": 1
+              },
+              "username": {
+                "minLength": 1
+              },
+              "password": {
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
     "resources": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "requests",
-        "limits"
-      ],
-      "properties": {
-        "requests": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "cpu",
-            "memory"
-          ],
-          "properties": {
-            "cpu": {
-              "$ref": "#/$defs/quantity"
-            },
-            "memory": {
-              "$ref": "#/$defs/quantity"
-            }
-          }
-        },
-        "limits": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "memory"
-          ],
-          "properties": {
-            "cpu": {
-              "$ref": "#/$defs/quantity"
-            },
-            "memory": {
-              "$ref": "#/$defs/quantity"
-            }
-          }
-        }
-      }
+      "$ref": "#/$defs/resources"
     }
   },
   "$defs": {
@@ -262,17 +320,6 @@
       "type": "string",
       "minLength": 1
     },
-    "fieldPath": {
-      "type": "string",
-      "pattern": "^\\$(\\.[^.\\[\\]]+|\\[\\*\\])*\\.[^.\\[\\]]+$"
-    },
-    "fieldPaths": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/fieldPath"
-      }
-    },
     "quantity": {
       "type": "string",
       "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|Ki|Mi|Gi)?$"
@@ -294,6 +341,26 @@
         },
         "CLUSTER_CLIENT_APPLICATION__TITLE": {
           "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_ACCESS__HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_ACCESS__SCHEME": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_ACCESS__USERNAME": {
+          "type": "string",
+          "pattern": "^[^:]+$"
+        },
+        "CLUSTER_CLIENT_ACCESS__PASSWORD": {
+          "$ref": "#/$defs/text"
+        },
+        "CLUSTER_CLIENT_ACCESS__CHALLENGE_HEADER": {
+          "$ref": "#/$defs/headerName"
+        },
+        "CLUSTER_CLIENT_ACCESS__REALM": {
+          "type": "string",
+          "pattern": "^[^\"]+$"
         },
         "CLUSTER_CLIENT_HEADERS__METHOD": {
           "$ref": "#/$defs/headerName"
@@ -337,6 +404,9 @@
         "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__STATUS_CODE": {
           "$ref": "#/$defs/errorStatusCode"
         },
+        "CLUSTER_CLIENT_FAILURES__UNAUTHORIZED__STATUS_CODE": {
+          "$ref": "#/$defs/errorStatusCode"
+        },
         "CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE": {
           "$ref": "#/$defs/errorStatusCode"
         },
@@ -350,6 +420,9 @@
           "$ref": "#/$defs/errorStatusCode"
         },
         "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__ERROR_CODE": {
+          "$ref": "#/$defs/errorCode"
+        },
+        "CLUSTER_CLIENT_FAILURES__UNAUTHORIZED__ERROR_CODE": {
           "$ref": "#/$defs/errorCode"
         },
         "CLUSTER_CLIENT_FAILURES__REJECTED__ERROR_CODE": {
@@ -396,6 +469,12 @@
           "$ref": "#/$defs/text"
         },
         "CLUSTER_CLIENT_LOG__LEVEL": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "CLUSTER_CLIENT_LOG__QUIET_PATHS": {
+          "$ref": "#/$defs/paths"
+        },
+        "CLUSTER_CLIENT_LOG__QUIET_KEPT_LEVEL": {
           "$ref": "#/$defs/logLevel"
         },
         "CLUSTER_CLIENT_LOG__CONSOLE__ENABLED": {
@@ -465,6 +544,63 @@
           "$ref": "#/$defs/text"
         }
       }
+    },
+    "dnsLabel": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "host": {
+      "type": "string",
+      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "optionalHost": {
+      "type": "string",
+      "pattern": "^(([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "string",
+      "pattern": "^\\[\\s*(\"/[^\"\\s]*\"\\s*(,\\s*\"/[^\"\\s]*\"\\s*)*)?\\]$"
     }
   }
 }

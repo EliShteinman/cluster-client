@@ -5,9 +5,7 @@ metadata:
   labels:
     {{- include "cluster-client.labels" . | nindent 4 }}
 spec:
-  {{- with .Values.route.host }}
-  host: {{ . }}
-  {{- end }}
+  host: {{ include "cluster-client.routeHost" . }}
   to:
     kind: Service
     name: {{ include "cluster-client.fullname" . }}

@@ -5,7 +5,4 @@ metadata:
   labels:
     {{- include "cluster-client.labels" . | nindent 4 }}
 data:
-  {{- range $name, $content := .Values.files }}
-  {{ $name }}: |
-    {{- toPrettyJson $content | nindent 4 }}
-  {{- end }}
+  {{- (.Files.Glob "files/*.json").AsConfig | nindent 2 }}

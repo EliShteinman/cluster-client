@@ -15,6 +15,8 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/files: {{ include (print $.Template.BasePath "/configmap-files.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/collector: {{ include (print $.Template.BasePath "/configmap-collector.yaml") . | sha256sum }}
+        checksum/collector-secret: {{ include (print $.Template.BasePath "/secret-collector.yaml") . | sha256sum }}
       labels:
         {{- include "cluster-client.selectorLabels" . | nindent 8 }}
     spec:
@@ -25,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "cluster-client.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -42,6 +44,21 @@ spec:
             - secretRef:
                 name: {{ include "cluster-client.fullname" . }}
             {{- end }}
+          {{- if .Values.collector.enabled }}
+          env:
+            - name: CLUSTER_CLIENT_LOG__LEVEL
+              value: {{ .Values.collector.logLevel | quote }}
+            - name: CLUSTER_CLIENT_LOG__FILE__ENABLED
+              value: "true"
+            - name: CLUSTER_CLIENT_LOG__FILE__FORMAT
+              value: json
+            - name: CLUSTER_CLIENT_LOG__FILE__PATH
+              value: {{ printf "%s/app.log" .Values.mounts.logs | quote }}
+            - name: CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED
+              value: "true"
+            - name: CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT
+              value: http://127.0.0.1:4318
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /health/live
@@ -58,6 +75,41 @@ spec:
               readOnly: true
             - name: logs
               mountPath: {{ .Values.mounts.logs }}
+        {{- if .Values.collector.enabled }}
+        - name: collector
+          image: {{ include "cluster-client.collectorImage" . | quote }}
+          imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+          args: ["--config=/etc/otelcol/config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: ELASTIC_ENDPOINT
+              value: {{ .Values.collector.elasticsearch.endpoint | quote }}
+            - name: ELASTIC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cluster-client.fullname" . }}-collector
+                  key: username
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cluster-client.fullname" . }}-collector
+                  key: password
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+          volumeMounts:
+            - name: collector
+              mountPath: /etc/otelcol
+              readOnly: true
+            - name: collector-state
+              mountPath: /var/lib/otelcol/file_storage
+            - name: logs
+              mountPath: {{ .Values.mounts.logs }}
+              readOnly: true
+        {{- end }}
       volumes:
         - name: files
           configMap:
@@ -65,3 +117,10 @@ spec:
         - name: logs
           emptyDir:
             sizeLimit: {{ .Values.logsSizeLimit }}
+        {{- if .Values.collector.enabled }}
+        - name: collector
+          configMap:
+            name: {{ include "cluster-client.fullname" . }}-collector
+        - name: collector-state
+          emptyDir: {}
+        {{- end }}

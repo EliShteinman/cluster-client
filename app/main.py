@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -16,6 +17,7 @@ from app.failures.handlers import (
     refused_request_response,
 )
 from app.logger.decorators import log_debug
+from app.logger.quiet import QuietPathsMiddleware
 from app.logger.setup import configure_logging, reset_logging
 from app.routes.cluster_routes import build_cluster_router
 from app.routes.health_routes import health_router
@@ -33,13 +35,21 @@ def create_app(*, settings: Settings) -> FastAPI:
     tracer_provider: TracerProvider = build_tracer_provider(settings=settings.telemetry)
     app.state.settings = settings
     app.state.tracer_provider = tracer_provider
-    FastAPIInstrumentor.instrument_app(app=app, tracer_provider=tracer_provider)
+    FastAPIInstrumentor.instrument_app(
+        app=app, tracer_provider=tracer_provider, excluded_urls=excluded_urls(paths=settings.log.quiet_paths)
+    )
+    app.add_middleware(middleware_class=QuietPathsMiddleware, paths=settings.log.quiet_paths)
     app.exception_handler(exc_class_or_status_code=HTTPException)(refused_request_response)
     app.exception_handler(exc_class_or_status_code=AccessDeniedError)(access_denied_response)
     app.exception_handler(exc_class_or_status_code=Exception)(internal_error_response)
     app.include_router(router=health_router)
     app.include_router(router=build_cluster_router(settings=settings))
     return app
+
+
+@log_debug
+def excluded_urls(*, paths: frozenset[str]) -> str:
+    return ",".join(f"^[a-z]+://[^/]+{re.escape(pattern=path)}$" for path in sorted(paths))
 
 
 @asynccontextmanager

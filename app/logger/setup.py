@@ -2,6 +2,7 @@ import logging
 
 from app.config.logging import LoggingSettings
 from app.logger.handlers import console_handler, file_handler
+from app.logger.quiet import QuietRequestFilter
 
 _installed: list[tuple[logging.Logger, logging.Handler]] = []
 
@@ -12,14 +13,21 @@ def configure_logging(*, settings: LoggingSettings) -> None:
     root.setLevel(level=settings.level)
     if settings.console.enabled:
         install(
-            logger=root, handler=console_handler(settings=settings.console, formatting=settings.formatting)
+            logger=root,
+            handler=console_handler(settings=settings.console, formatting=settings.formatting),
+            settings=settings,
         )
     if settings.file.enabled:
-        install(logger=root, handler=file_handler(settings=settings.file, formatting=settings.formatting))
+        install(
+            logger=root,
+            handler=file_handler(settings=settings.file, formatting=settings.formatting),
+            settings=settings,
+        )
     if settings.failure_file.enabled:
         install(
             logger=logging.getLogger(name=settings.failure_file.logger_name),
             handler=file_handler(settings=settings.failure_file, formatting=settings.formatting),
+            settings=settings,
         )
 
 
@@ -30,6 +38,8 @@ def reset_logging() -> None:
     _installed.clear()
 
 
-def install(*, logger: logging.Logger, handler: logging.Handler) -> None:
+def install(*, logger: logging.Logger, handler: logging.Handler, settings: LoggingSettings) -> None:
+    kept_level: int = logging.getLevelNamesMapping()[settings.quiet_kept_level]
+    handler.addFilter(filter=QuietRequestFilter(kept_level=kept_level))
     logger.addHandler(hdlr=handler)
     _installed.append((logger, handler))

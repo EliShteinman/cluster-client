@@ -64,7 +64,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |
 | `app/response_builder.py` | `build_response(cluster_response, rules, settings)` |
 | `app/rules.py` | `ResponseRules` (schema validator, ignored and redacted fields) and `load_rules` |
-| `app/json_file.py` | `read_json_file` (reads a JSON file from `config/`, raises the given `ConfigFileLoadError`) |
+| `app/json_file.py` | `read_json_file` (reads one of the runtime JSON files, raises the given `ConfigFileLoadError`) |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `validate_body`, `violation_at`, `every_error` |
 | `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `failure_details`, `failure_body`, `own_answer`: every answer the service writes itself), `reason_parts.py` (`reason_parts`, `shortened_field`), `handlers.py` (`refused_request_response`, `access_denied_response` (adds the `www-authenticate` challenge), `internal_error_response`, `logged_answer`: the one place that logs a failure and builds its answer) |
@@ -74,7 +74,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/logger/decorators.py` | `log_debug`, `log_info` |
 | `app/logger/quiet.py` | `QuietPathsMiddleware` (marks a request to `log.quiet_paths` in the `quiet_request` context variable), `QuietRequestFilter` (on every handler: drops its records below `log.quiet_kept_level`, uvicorn's access line included; failures stay) |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
-| `config/response-schema.json`, `config/ignored-fields.json`, `config/redacted-fields.json` | the three runtime files (never baked into the image) |
+| `helm/files/response-schema.json`, `helm/files/ignored-fields.json`, `helm/files/redacted-fields.json` | the three runtime files, one copy only: the local default path and the Helm files ConfigMap (never baked into the image) |
 | `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap (every `helm/files/*.json`, as is), optional collector sidecar (`collector.*`). One values file per network in `helm/networks/` (`domain`, optional `image.tag` / `route.host`); `_helpers.tpl` builds the image and route host from `domain`. `values.schema.json` restricts every value; generated keys are the env vars, minus those the image owns (host, port) |
 | `config/examples/` | example schema + ignored fields for every answer the manager uses; real answers, passwords replaced, are in `tests/support/cluster_samples/` |
 
@@ -172,9 +172,9 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   service answers itself (`invalid_request` and `internal_error` included) is written there with the full
   `reason` and `field`, at WARNING/ERROR, not only at DEBUG. Only the answer is cut to the firewall limits.
   `internal_error` sends and logs the error and its traceback.
-- **`helm/files/` copies** `config/redacted-fields.json` and `config/ignored-fields.json` (Helm reads only inside
-  the chart); `tests/unit/test_helm_files.py` fails when a copy differs. `response-schema.json` differs on purpose:
-  locally a placeholder, in Helm the firewall schema. The collector keeps its read offset of `app.log` in the
+- **The runtime files live only in `helm/files/`** (owner's decision 2026-11-15: never two copies). Helm reads
+  only inside the chart, so the local run's default paths point there too; the container gets them at
+  `/etc/cluster-client/` (env in the Dockerfile). The collector keeps its read offset of `app.log` in the
   `collector-state` `emptyDir` (`file_storage`), so a collector restart resends nothing.
 - **One schema, one set of field files per service.** More technologies later: first change the schema, change
   the logic only if there is no other choice. Non-JSON answers stay rejected, Redis-specific defaults stay.

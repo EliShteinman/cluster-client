@@ -79,9 +79,9 @@ Three files are read at startup; replace them without touching the code or the i
 
 | File | Setting | Content |
 |---|---|---|
-| `config/response-schema.json` | `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | the JSON Schema every answer must match |
-| `config/ignored-fields.json` | `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | field paths removed before the check |
-| `config/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log and of a rejection's explanation (passwords) |
+| `helm/files/response-schema.json` | `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | the JSON Schema every answer must match |
+| `helm/files/ignored-fields.json` | `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | field paths removed before the check |
+| `helm/files/redacted-fields.json` | `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | field paths left out of the failure log and of a rejection's explanation (passwords) |
 
 Ignored and redacted fields use the same format as `field` in a rejection, with `[*]` for every item of a list:
 
@@ -133,9 +133,9 @@ already. Lists are JSON (`["a", "b"]`).
 | `CLUSTER_CLIENT_HEADERS__URL` | `x-cluster-url` |
 | `CLUSTER_CLIENT_HEADERS__AUTHORIZATION` | `x-cluster-authorization` |
 | `CLUSTER_CLIENT_HEADERS__CONTENT_TYPE` | `content-type` |
-| `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | `config/response-schema.json` |
-| `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | `config/ignored-fields.json` |
-| `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | `config/redacted-fields.json` |
+| `CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH` | `helm/files/response-schema.json` |
+| `CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH` | `helm/files/ignored-fields.json` |
+| `CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH` | `helm/files/redacted-fields.json` |
 | `CLUSTER_CLIENT_FORWARDING__CONNECT_TIMEOUT_SECONDS` | `5.0` |
 | `CLUSTER_CLIENT_FORWARDING__TIMEOUT_SECONDS` | `28.0` |
 | `CLUSTER_CLIENT_FORWARDING__AUTHORIZATION_HEADER` | `authorization` |

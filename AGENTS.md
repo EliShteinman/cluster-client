@@ -18,28 +18,31 @@ for byte**. cluster-client never "fixes" an answer.
 one visible call:
 
 1. OpenTelemetry (`FastAPIInstrumentor`, `app/telemetry.py`) continues the manager's `traceparent` (or starts a trace).
-2. `read_cluster_request` (`app/routes/read_request.py`) turns the incoming headers + body into a
+2. `require_access`, a route dependency that runs before the body is read, calls `check_access` (`app/access.py`), which compares the access header (`authorization`) with
+   `Basic base64(username:password)` from `settings.access`. Missing/wrong → `AccessDeniedError` → HTTP 401 with
+   `x-edge-error: unauthorized`. Nothing is sent to the cluster.
+3. `read_cluster_request` (`app/routes/read_request.py`) turns the incoming headers + body into a
    `ClusterRequest`, including the configured pass-through headers. Missing/invalid header → HTTP 400 with
    `x-edge-error: invalid_request` (from config). Nothing is sent to the cluster.
-3. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`; `RequestsInstrumentor` adds
+4. `send_to_cluster` (`app/cluster_client.py`) calls the cluster with `requests`; `RequestsInstrumentor` adds
    `traceparent`. Any `RequestException` →
    `ConnectionFailedError` when the request surely did not leave (`requests` wraps it in `MaxRetryError`:
    refused, DNS, connect timeout), else `NoResponseError` (read timeout, connection cut, any TLS error: it can
    happen after the cluster got the request).
-4. `build_response` (`app/response_builder.py`):
+5. `build_response` (`app/response_builder.py`):
    - empty body (e.g. 204) → returned as is;
    - decode JSON (not JSON → `ResponseRejectedError`, rule `not_json_rule`, field `$`);
    - `remove_fields` (`app/field_paths.py`) removes the configured ignored field paths ("function X");
    - `validate_body` (`app/schema.py`) checks the JSON Schema (violation → `ResponseRejectedError` with the
      failing `rule` and field, e.g. `$.uid`, and a `reason` built from a copy without the redacted fields);
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
-5. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file (redacted
+6. On any `RequestFailedError`: `record_failure` writes one JSON line to the failure log file (redacted
    fields left out of the cluster response), then `failure_response` builds the answer with `x-edge-error`,
    and on a rejection `x-edge-cluster-status` (`app/failures/`). Both start from the same `failure_details`; the
    file keeps it whole, only the answer is cut (`failure_body`, `app/failures/reason_parts.py`). Anything else the service answers itself goes
-   through the handlers of `app/failures/handlers.py`, so every such answer has `x-edge-error`: `HTTPException`
-   (bad headers, wrong path, wrong method) → `invalid_request`; any other exception → `internal_error`.
-6. The route returns status + headers + body; OpenTelemetry adds `traceresponse`.
+   through the handlers of `app/failures/handlers.py`, so every such answer has `x-edge-error`: `AccessDeniedError` →
+   `unauthorized`; `HTTPException` (bad headers, wrong path, wrong method) → `invalid_request`; any other exception → `internal_error`.
+7. The route returns status + headers + body; OpenTelemetry adds `traceresponse`.
 
 Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/diagrams/class-diagram.drawio`.
 
@@ -50,27 +53,29 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/main.py` | `create_app(settings)` (factory: builds the app's `TracerProvider`, `FastAPIInstrumentor`) and `lifespan` (startup: configure logging, start telemetry, load the `ResponseRules` into `app.state.rules`; shutdown: stop telemetry) |
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/telemetry.py` | `build_tracer_provider` (one per app, never global), `start_telemetry` / `stop_telemetry`: instrument and uninstrument `requests` and logs |
-| `app/config/` | **every** setting. Import order `constants` → `utils` → `field_types` → `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the one `BaseSettings` every config class extends; frozen, env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`), one file per section (`server.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`; `NoEnvFileSettings` ignores `.env`) |
+| `app/config/` | **every** setting. Import order `constants` → `utils` → `field_types` → `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the one `BaseSettings` every config class extends; frozen, env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`), one file per section (`server.py`, `access.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`; `NoEnvFileSettings` ignores `.env`) |
 | `app/models.py` | `FrozenModel` (base of the data models), `ClusterRequest`, `ClusterResponse`, `FailureBody`, `FailureDetails`, `RequestFailure`, `HttpMethod`, `HealthStatus` |
-| `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
-| `app/routes/cluster_routes.py` | `build_cluster_router(settings)` and the `POST /` orchestrator `cluster_endpoint` |
+| `app/errors.py` | `ClusterClientError` → `AccessDeniedError`, `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `ClusterUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `ResponseRejectedError` |
+| `app/routes/cluster_routes.py` | `build_cluster_router(settings)`, `require_access` (dependency of `POST /`) and the `POST /` orchestrator `cluster_endpoint` |
 | `app/routes/cluster_openapi.py` | the OpenAPI of `POST /` from the settings: request headers, every failure status with `FailureBody` and its headers |
 | `app/routes/read_request.py` | `read_body` (async, see below), `read_cluster_request`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
+| `app/access.py` | `check_access`, `expected_credentials` (not decorated: its result holds the password) |
 | `app/cluster_client.py` | `send_to_cluster`, `unreachable_error`, `was_not_sent`, `outgoing_headers`, `returned_headers` |
 | `app/response_builder.py` | `build_response(cluster_response, rules, settings)` |
 | `app/rules.py` | `ResponseRules` (schema validator, ignored and redacted fields) and `load_rules` |
 | `app/json_file.py` | `read_json_file` (reads a JSON file from `config/`, raises the given `ConfigFileLoadError`) |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `remove_field` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema`, `validate_body`, `violation_at`, `every_error` |
-| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `failure_details`, `failure_body`, `own_answer`: every answer the service writes itself), `reason_parts.py` (`reason_parts`, `shortened_field`), `handlers.py` (`refused_request_response`, `internal_error_response`) |
+| `app/failures/` | `codes.py` (`failure_code`), `log.py` (`record_failure`, `failure_record`, `redacted_content`), `response.py` (`failure_response`, `failure_details`, `failure_body`, `own_answer`: every answer the service writes itself), `reason_parts.py` (`reason_parts`, `shortened_field`), `handlers.py` (`refused_request_response`, `access_denied_response` (adds the `www-authenticate` challenge), `internal_error_response`, `logged_answer`: the one place that logs a failure and builds its answer) |
 | `app/logger/formatters.py` | JSON + line formatters |
 | `app/logger/handlers.py` | terminal / file handlers |
 | `app/logger/setup.py` | `configure_logging`, `reset_logging` |
 | `app/logger/decorators.py` | `log_debug`, `log_info` |
+| `app/logger/quiet.py` | `QuietPathsMiddleware` (marks a request to `log.quiet_paths` in the `quiet_request` context variable), `QuietRequestFilter` (on every handler: drops its records below `log.quiet_kept_level`, uvicorn's access line included; failures stay) |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
 | `config/response-schema.json`, `config/ignored-fields.json`, `config/redacted-fields.json` | the three runtime files (never baked into the image) |
-| `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap. `values.schema.json` restricts every value; generated keys are the env vars, minus those the image owns (host, port) |
+| `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap (every `helm/files/*.json`, as is), optional collector sidecar (`collector.*`). One values file per network in `helm/networks/` (`domain`, optional `image.tag` / `route.host`); `_helpers.tpl` builds the image and route host from `domain`. `values.schema.json` restricts every value; generated keys are the env vars, minus those the image owns (host, port) |
 | `config/examples/` | example schema + ignored fields for every answer the manager uses; real answers, passwords replaced, are in `tests/support/cluster_samples/` |
 
 ## Mandatory coding rules (the owner enforces these strictly)
@@ -114,6 +119,12 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   `ClusterRequest` field of the same name; `read_cluster_request` maps them and a refusal names the header
   (`loc: ["x-cluster-url"]`). Env names: `CLUSTER_CLIENT_HEADERS__*`.
 - **`authorization` is required** (no request may reach a cluster without credentials).
+- **Access to the cluster client** (owner's decision 2026-11-15): one header (`settings.access.header`,
+  `authorization`, the standard header) with `Basic base64(username:password)` (scheme in any case, credentials compared in constant time), checked by the `require_access` dependency before the body is read. `/docs` shows it as an HTTP Basic login (`BasicAuthDocumentation`, documentation only: it checks nothing). The
+  DataPower in front authenticates with the same header and passes it on; it is never sent to the cluster (the
+  cluster gets its own `authorization`, built from `x-cluster-authorization`). Username and
+  password have no defaults: the service does not start without them; in Helm they are required in `secret`.
+  Health endpoints stay open (probes). More complex access logic only when the owner asks.
 - **Response headers**: all cluster headers are returned except `recomputed_response_headers` (content-length,
   content-encoding, transfer-encoding, connection). uvicorn's own `date`/`server` headers are off.
 - **Ignored field paths** use the same format as the `field` of a rejection: `$.a.b`, `[*]` for every list item
@@ -124,9 +135,17 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - **Pass-through headers** (`cluster-state-id`, `x-task-id`, `x-result-ttl`) are sent as they are; the
   client's own authorization and content-type always win over them, and OpenTelemetry sets `traceparent`.
 - **Tracing** is OpenTelemetry. Find a failure by the `trace_id` of the `traceresponse` header (the manager's own
-  trace id). Spans leave only when `telemetry.export_enabled` is on; default off. `LoggingInstrumentor` only adds
-  `otelTraceID`/`otelSpanID` to records: `enable_log_auto_instrumentation=False` keeps logs, with their passwords,
-  from leaving through OTLP.
+  trace id). `LoggingInstrumentor` only adds `otelTraceID`/`otelSpanID` to records.
+- **Logs and traces to Elastic** (owner's decision 2026-11-15): the service never talks to Elastic. Helm
+  `collector.enabled` adds an OpenTelemetry Collector sidecar (`configmap-collector.yaml`, `secret-collector.yaml`):
+  the service writes every line at `collector.logLevel` (default DEBUG, passwords included) as JSON to
+  `logs/app.log` (shared `emptyDir`) and sends spans to `127.0.0.1:4318`; the collector reads both and sends them
+  to Elasticsearch with its own username/password. Logs still never leave through the service's OTLP
+  (`enable_log_auto_instrumentation=False`). The owner will remove secrets before they are logged when needed.
+- **Quiet paths** (owner's decision 2026-11-15): requests to `log.quiet_paths` (default the two probes) write no
+  log line below `log.quiet_kept_level` (WARNING) in any handler, so their failures still reach the failure file,
+  and get no span (`excluded_urls` of `FastAPIInstrumentor`, anchored to the exact path), so the probes do not
+  flood the terminal and Elastic.
 - `RequestsInstrumentor` patches `requests` in the whole process: a test client using `requests` in the same
   process gets its `traceparent` overwritten.
 - **Timeouts**: `requests` applies its timeout per stage, so `connect_timeout_seconds` + `timeout_seconds` is kept
@@ -151,6 +170,10 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   service answers itself (`invalid_request` and `internal_error` included) is written there with the full
   `reason` and `field`, at WARNING/ERROR, not only at DEBUG. Only the answer is cut to the firewall limits.
   `internal_error` sends and logs the error and its traceback.
+- **`helm/files/` copies** `config/redacted-fields.json` and `config/ignored-fields.json` (Helm reads only inside
+  the chart); `tests/unit/test_helm_files.py` fails when a copy differs. `response-schema.json` differs on purpose:
+  locally a placeholder, in Helm the firewall schema. The collector keeps its read offset of `app.log` in the
+  `collector-state` `emptyDir` (`file_storage`), so a collector restart resends nothing.
 - **One schema, one set of field files per service.** More technologies later: first change the schema, change
   the logic only if there is no other choice. Non-JSON answers stay rejected, Redis-specific defaults stay.
 

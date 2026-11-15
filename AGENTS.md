@@ -140,7 +140,9 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   `collector.enabled` adds an OpenTelemetry Collector sidecar (`configmap-collector.yaml`, `secret-collector.yaml`):
   the service writes every line at `collector.logLevel` (default DEBUG, passwords included) as JSON to
   `logs/app.log` (shared `emptyDir`) and sends spans to `127.0.0.1:4318`; the collector reads both and sends them
-  to Elasticsearch with its own username/password. Logs still never leave through the service's OTLP
+  to Elasticsearch with its own username/password, into the data streams `logs-cluster_client.otel-default`
+  and `traces-cluster_client.otel-default` (`data_stream.dataset` resource attribute): one place for this service,
+  the same in every network (owner's decision). Logs still never leave through the service's OTLP
   (`enable_log_auto_instrumentation=False`). The owner will remove secrets before they are logged when needed.
 - **Quiet paths** (owner's decision 2026-11-15): requests to `log.quiet_paths` (default the two probes) write no
   log line below `log.quiet_kept_level` (WARNING) in any handler, so their failures still reach the failure file,

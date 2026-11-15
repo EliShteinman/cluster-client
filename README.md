@@ -241,6 +241,9 @@ collector:
     endpoint: https://elastic.<domain>:9200
 ```
 
+Everything from this service, in every network, goes to the same data streams: `logs-cluster_client.otel-default`
+and `traces-cluster_client.otel-default`. The Elastic user needs to write to them.
+
 ```bash
 helm upgrade --install cluster-client ./helm -f helm/networks/<network>.yaml \
   --set collector.elasticsearch.username=<user> --set collector.elasticsearch.password="$ELASTIC_PASSWORD" ...

@@ -42,6 +42,9 @@ data:
           - key: service.name
             value: {{ .Chart.Name }}
             action: upsert
+          - key: data_stream.dataset
+            value: {{ .Chart.Name | replace "-" "_" }}
+            action: upsert
       batch: {}
     exporters:
       elasticsearch:
@@ -59,7 +62,7 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch]
+          processors: [resource, batch]
           exporters: [elasticsearch]
         logs:
           receivers: [file_log]

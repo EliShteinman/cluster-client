@@ -3,5 +3,5 @@ from app.main import create_app
 from app.server import serve
 
 if __name__ == "__main__":
-    settings: Settings = Settings()
+    settings: Settings = Settings()  # pyright: ignore[reportCallIssue]
     serve(app=create_app(settings=settings), settings=settings.server)

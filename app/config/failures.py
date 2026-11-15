@@ -14,6 +14,7 @@ class FailureCode(BaseConfig):
 
 class FailureSettings(BaseConfig):
     invalid_request: FailureCode = Field(default=FailureCode(status_code=400, error_code="invalid_request"))
+    unauthorized: FailureCode = Field(default=FailureCode(status_code=401, error_code="unauthorized"))
     rejected: FailureCode = Field(default=FailureCode(status_code=502, error_code="response_rejected"))
     connection_failed: FailureCode = Field(
         default=FailureCode(status_code=502, error_code="connection_failed")

@@ -3,6 +3,7 @@ from typing import ClassVar
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
+from app.config.access import AccessSettings
 from app.config.base import BaseConfig
 from app.config.failures import FailureSettings
 from app.config.forwarding import ForwardingSettings
@@ -16,6 +17,7 @@ from app.config.validation import ValidationSettings
 class Settings(BaseConfig):
     server: ServerSettings = Field(default_factory=ServerSettings)
     application: ApplicationSettings = Field(default_factory=ApplicationSettings)
+    access: AccessSettings
     headers: HeaderSettings = Field(default_factory=HeaderSettings)
     validation: ValidationSettings = Field(default_factory=ValidationSettings)
     forwarding: ForwardingSettings = Field(default_factory=ForwardingSettings)

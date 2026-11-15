@@ -21,6 +21,11 @@ class FieldPathsLoadError(ConfigFileLoadError):
     content: ClassVar[str] = "the field paths"
 
 
+class AccessDeniedError(ClusterClientError):
+    def __init__(self, *, header: str) -> None:
+        super().__init__(f"the {header} header is missing or does not hold the expected credentials")
+
+
 class RequestFailedError(ClusterClientError):
     def __init__(self, *, reason: str, field: str | None = None, rule: str | None = None) -> None:
         super().__init__(reason)

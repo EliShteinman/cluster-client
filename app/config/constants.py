@@ -7,3 +7,4 @@ HTTP_HEADER_NAME_PATTERN: str = r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"
 MAX_PORT: int = 65535
 ERROR_STATUS_CODE_MIN: int = 400
 ERROR_STATUS_CODE_MAX: int = 599
+BASIC_USERNAME_PATTERN: str = r"^[^:]+$"

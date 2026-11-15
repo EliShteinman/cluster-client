@@ -9,7 +9,12 @@ from starlette.exceptions import HTTPException
 
 from app.config.constants import DISTRIBUTION_NAME
 from app.config.settings import Settings
-from app.failures.handlers import internal_error_response, refused_request_response
+from app.errors import AccessDeniedError
+from app.failures.handlers import (
+    access_denied_response,
+    internal_error_response,
+    refused_request_response,
+)
 from app.logger.decorators import log_debug
 from app.logger.setup import configure_logging, reset_logging
 from app.routes.cluster_routes import build_cluster_router
@@ -30,6 +35,7 @@ def create_app(*, settings: Settings) -> FastAPI:
     app.state.tracer_provider = tracer_provider
     FastAPIInstrumentor.instrument_app(app=app, tracer_provider=tracer_provider)
     app.exception_handler(exc_class_or_status_code=HTTPException)(refused_request_response)
+    app.exception_handler(exc_class_or_status_code=AccessDeniedError)(access_denied_response)
     app.exception_handler(exc_class_or_status_code=Exception)(internal_error_response)
     app.include_router(router=health_router)
     app.include_router(router=build_cluster_router(settings=settings))

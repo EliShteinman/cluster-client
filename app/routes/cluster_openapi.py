@@ -1,6 +1,8 @@
 from typing import cast
 
+from fastapi.security import HTTPBasic
 from pydantic import TypeAdapter
+from starlette.requests import Request
 
 from app.config.failures import FailureCode
 from app.config.settings import Settings
@@ -8,6 +10,11 @@ from app.logger.decorators import log_debug
 from app.models import ClusterRequest, FailureBody
 
 type OpenApiObject = dict[str, object]
+
+
+class BasicAuthDocumentation(HTTPBasic):
+    async def __call__(self, request: Request) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return None
 
 
 @log_debug

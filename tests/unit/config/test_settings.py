@@ -3,12 +3,13 @@ from pydantic import ValidationError
 
 from app.config.failures import FailureSettings
 from app.config.settings import NoEnvFileSettings
+from tests.support.access import ACCESS
 
 
 def test_one_env_value_keeps_the_other_defaults_of_its_section(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE", "503")
 
-    assert NoEnvFileSettings().failures.rejected.error_code == "response_rejected"
+    assert NoEnvFileSettings(access=ACCESS).failures.rejected.error_code == "response_rejected"
 
 
 @pytest.mark.parametrize(

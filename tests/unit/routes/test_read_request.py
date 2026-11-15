@@ -10,9 +10,11 @@ from app.config.headers import HeaderSettings
 from app.config.settings import NoEnvFileSettings, Settings
 from app.models import ClusterRequest, HttpMethod
 from app.routes.read_request import read_cluster_request
+from tests.support.access import ACCESS
 from tests.support.requests import CLUSTER_HEADERS, CLUSTER_URL
 
 SETTINGS: Settings = NoEnvFileSettings(
+    access=ACCESS,
     failures=FailureSettings(invalid_request=FailureCode(status_code=422, error_code="bad_request")),
     forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"x-task-id"})),
 )
@@ -47,7 +49,7 @@ def test_refusal_names_the_missing_header() -> None:
 
 
 def test_header_names_come_from_the_given_settings() -> None:
-    settings: Settings = NoEnvFileSettings(headers=HeaderSettings(method="X-Verb"))
+    settings: Settings = NoEnvFileSettings(access=ACCESS, headers=HeaderSettings(method="X-Verb"))
     headers: dict[str, str] = {**CLUSTER_HEADERS, "x-verb": "POST"}
     del headers["x-cluster-method"]
 
@@ -68,6 +70,7 @@ def test_configured_headers_are_passed_through() -> None:
 
 def test_passed_through_header_is_configured_in_any_case() -> None:
     settings: Settings = NoEnvFileSettings(
+        access=ACCESS,
         forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"X-Task-Id"})),
     )
 

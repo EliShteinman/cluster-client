@@ -12,17 +12,24 @@ from jsonschema import Draft4Validator, Draft202012Validator
 
 from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import NoEnvFileSettings, Settings
-from app.errors import ConnectionFailedError, NoResponseError, RequestFailedError, ResponseRejectedError
+from app.errors import (
+    AccessDeniedError,
+    ConnectionFailedError,
+    NoResponseError,
+    RequestFailedError,
+    ResponseRejectedError,
+)
 from app.failures.codes import failure_code
-from app.failures.handlers import internal_error_response, refused_request_response
+from app.failures.handlers import access_denied_response, internal_error_response, refused_request_response
 from app.failures.log import failure_record, redacted_content
 from app.failures.response import failure_response
 from app.field_paths import FieldPath
 from app.models import ClusterResponse, RequestFailure
 from app.schema import validate_body
+from tests.support.access import ACCESS
 from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
 
-SETTINGS: Settings = NoEnvFileSettings()
+SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
 CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=CLUSTER_URL, reason="refused")
 NO_RESPONSE: NoResponseError = NoResponseError(url=CLUSTER_URL, reason="read timed out")
 REJECTION: ResponseRejectedError = ResponseRejectedError(
@@ -125,7 +132,7 @@ def test_content_that_is_not_json_is_kept_as_text() -> None:
 
 def test_response_uses_the_configured_status_code() -> None:
     settings: Settings = NoEnvFileSettings(
-        failures=FailureSettings(rejected=FailureCode(status_code=422, error_code="bad"))
+        access=ACCESS, failures=FailureSettings(rejected=FailureCode(status_code=422, error_code="bad"))
     )
 
     assert failure_response(failure=REJECTION, cluster_response=None, settings=settings).status_code == 422
@@ -157,6 +164,18 @@ def test_a_refused_request_keeps_its_headers() -> None:
     error: HTTPException = HTTPException(status_code=405, headers={"allow": "POST"})
 
     assert refused_request_response(REQUEST, error).headers["allow"] == "POST"
+
+
+def test_denied_access_is_marked_as_our_own_answer() -> None:
+    response: Response = access_denied_response(REQUEST, AccessDeniedError(header="authorization"))
+
+    assert (response.status_code, response.headers["x-edge-error"]) == (401, "unauthorized")
+
+
+def test_denied_access_asks_for_basic_credentials() -> None:
+    response: Response = access_denied_response(REQUEST, AccessDeniedError(header="authorization"))
+
+    assert response.headers["www-authenticate"] == 'Basic realm="cluster-client"'
 
 
 def test_an_unexpected_error_is_marked_as_our_own_answer() -> None:
@@ -202,8 +221,17 @@ def test_rejected_password_is_left_out_of_the_failure_record() -> None:
         lambda: failure_response(failure=LONG_NO_RESPONSE, cluster_response=None, settings=SETTINGS),
         lambda: refused_request_response(REQUEST, HTTPException(status_code=400, detail=HEADER_ERRORS)),
         lambda: internal_error_response(REQUEST, raised_error(message=LONG_TEXT)),
+        lambda: access_denied_response(REQUEST, AccessDeniedError(header="authorization")),
     ],
-    ids=["rejection", "not json", "connection failed", "timeout", "invalid request", "internal error"],
+    ids=[
+        "rejection",
+        "not json",
+        "connection failed",
+        "timeout",
+        "invalid request",
+        "internal error",
+        "unauthorized",
+    ],
 )
 def test_every_own_answer_passes_the_firewall(answer: Callable[[], ClusterResponse | Response]) -> None:
     assert FIREWALL.is_valid(instance=json.loads(s=content_of(answer=answer())))

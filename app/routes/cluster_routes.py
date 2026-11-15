@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, Security
 
+from app.access import check_access
 from app.cluster_client import send_to_cluster
 from app.config.settings import Settings
 from app.errors import RequestFailedError
@@ -10,7 +11,7 @@ from app.failures.response import failure_response
 from app.logger.decorators import log_debug, log_info
 from app.models import ClusterRequest, ClusterResponse, HttpMethod
 from app.response_builder import build_response
-from app.routes.cluster_openapi import failure_responses, request_documentation
+from app.routes.cluster_openapi import BasicAuthDocumentation, failure_responses, request_documentation
 from app.routes.read_request import read_body, read_cluster_request
 from app.rules import ResponseRules
 
@@ -25,8 +26,23 @@ def build_cluster_router(*, settings: Settings) -> APIRouter:
         response_description="The cluster's own answer: its status, headers and body, unchanged",
         responses=failure_responses(settings=settings),
         openapi_extra=request_documentation(settings=settings),
+        dependencies=[
+            Depends(dependency=require_access),
+            Security(
+                dependency=BasicAuthDocumentation(
+                    scheme_name="manager",
+                    description="The manager's username and password, checked on every call",
+                )
+            ),
+        ],
     )
     return router
+
+
+@log_debug
+def require_access(*, request: Request) -> None:
+    settings: Settings = request.app.state.settings
+    check_access(headers=dict(request.headers), settings=settings.access)
 
 
 @log_info(outputs=("status_code",))

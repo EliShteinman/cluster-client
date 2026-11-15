@@ -1,7 +1,8 @@
 from app.config.settings import NoEnvFileSettings, Settings
 from app.routes.cluster_openapi import cluster_request_headers, failure_responses
+from tests.support.access import ACCESS
 
-SETTINGS: Settings = NoEnvFileSettings()
+SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
 
 
 def test_failure_codes_sharing_a_status_are_documented_together() -> None:

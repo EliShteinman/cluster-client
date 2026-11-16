@@ -69,8 +69,8 @@ Every body the cluster client writes itself passes the firewall's response schem
 ```
 
 - `rule`: the JSON Schema keyword that failed (`not_json` when the answer is not JSON); rejections only.
-- `field`: the failing field; longer than 512 characters, it is cut from the start and begins with `...`.
-- `reason`: the whole explanation in parts of up to 512 characters; joined, they are the full text. Above 500
+- `field`: the failing field; longer than 256 characters, it is cut from the start and begins with `...`.
+- `reason`: the whole explanation in parts of up to 256 characters; joined, they are the full text. Above 500
   parts, the last part says how many characters were not sent.
 - The explanation is built after removing the redacted fields, so no listed password reaches it; a failure in a
   redacted field itself is explained without its value. The original explanation is in the DEBUG log.
@@ -157,7 +157,7 @@ already. Lists are JSON (`["a", "b"]`).
 | `CLUSTER_CLIENT_FAILURES__ERROR_HEADER` | `x-edge-error` |
 | `CLUSTER_CLIENT_FAILURES__CLUSTER_STATUS_HEADER` | `x-edge-cluster-status` |
 | `CLUSTER_CLIENT_FAILURES__CONTENT_TYPE` | `application/json` |
-| `CLUSTER_CLIENT_FAILURES__PART_LENGTH` | `512` |
+| `CLUSTER_CLIENT_FAILURES__PART_LENGTH` | `256` |
 | `CLUSTER_CLIENT_FAILURES__MAX_PARTS` | `500` |
 | `CLUSTER_CLIENT_FAILURES__SHORTENED_FIELD_PREFIX` | `...` |
 | `CLUSTER_CLIENT_FAILURES__UNSENT_CHARACTERS_MESSAGE` | `{count} more characters were not sent` |

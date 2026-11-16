@@ -17,8 +17,8 @@ def test_one_env_value_keeps_the_other_defaults_of_its_section(monkeypatch: pyte
     [
         {"unsent_characters_message": "{count} left {unknown}"},
         {"not_json_reason": "not JSON: {unknown}"},
-        {"unsent_characters_message": "{count}" + "x" * 512},
-        {"shortened_field_prefix": "." * 512},
+        {"unsent_characters_message": "{count}" + "x" * 256},
+        {"shortened_field_prefix": "." * 256},
     ],
     ids=["unknown unsent placeholder", "unknown not-JSON placeholder", "long unsent message", "long prefix"],
 )

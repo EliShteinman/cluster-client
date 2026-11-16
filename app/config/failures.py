@@ -24,7 +24,7 @@ class FailureSettings(BaseConfig):
     error_header: HeaderName = Field(default="x-edge-error")
     cluster_status_header: HeaderName = Field(default="x-edge-cluster-status")
     content_type: str = Field(default="application/json")
-    part_length: int = Field(default=512, gt=0)
+    part_length: int = Field(default=256, gt=0)
     max_parts: int = Field(default=500, gt=1)
     shortened_field_prefix: str = Field(default="...")
     unsent_characters_message: str = Field(default="{count} more characters were not sent")

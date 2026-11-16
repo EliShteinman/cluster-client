@@ -29,7 +29,7 @@
       "additionalItems": false
     },
     "level_2": {
-      "description": "level 2: object | array | string | number | boolean | null (stats intervals (140), shard_list up to 80 (40 shards x 2), bdb inside a list (172), ssh key 380, version maps)",
+      "description": "level 2: object | array | string | number | boolean | null (stats intervals (140), shard_list up to 80 (40 shards x 2), bdb inside a list (172), version maps; tokens, certificates and keys are removed by the relay)",
       "type": [
         "object",
         "array",
@@ -39,7 +39,7 @@
         "null"
       ],
       "minLength": 0,
-      "maxLength": 512,
+      "maxLength": 256,
       "minimum": -1,
       "maximum": 1000000000000000,
       "minProperties": 0,
@@ -68,7 +68,7 @@
         "null"
       ],
       "minLength": 0,
-      "maxLength": 512,
+      "maxLength": 256,
       "minimum": -1,
       "maximum": 1000000000000000,
       "minProperties": 0,

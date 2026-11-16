@@ -14,5 +14,9 @@
   "$.syncer_cert",
   "$.syncer_key",
   "$.authentication_ssl_crdt_certs",
-  "$[*].authentication_ssl_crdt_certs"
+  "$[*].authentication_ssl_crdt_certs",
+  "$.instances[*].server_cert",
+  "$.crdbs[*].instances[*].server_cert",
+  "$.crdt_sources[*].server_cert",
+  "$[*].crdt_sources[*].server_cert"
 ]

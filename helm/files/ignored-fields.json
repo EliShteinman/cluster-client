@@ -12,5 +12,7 @@
   "$.proxy_cert",
   "$.proxy_key",
   "$.syncer_cert",
-  "$.syncer_key"
+  "$.syncer_key",
+  "$.authentication_ssl_crdt_certs",
+  "$[*].authentication_ssl_crdt_certs"
 ]

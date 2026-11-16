@@ -34,7 +34,8 @@
             {
               "description": "the acl list of a database object, always empty",
               "type": "array",
-              "maxItems": 0
+              "maxItems": 0,
+              "additionalItems": false
             }
           ]
         }
@@ -81,7 +82,8 @@
             {
               "description": "the acl list of a database object, always empty",
               "type": "array",
-              "maxItems": 0
+              "maxItems": 0,
+              "additionalItems": false
             }
           ]
         }

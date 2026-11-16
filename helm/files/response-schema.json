@@ -16,11 +16,29 @@
       "minProperties": 0,
       "maxProperties": 300,
       "patternProperties": {
-        "^[A-Za-z0-9_-]{1,64}$": {
+        "^(?!acl$)[A-Za-z0-9_-]{1,64}$": {
           "$ref": "#/definitions/level_2"
         }
       },
       "additionalProperties": false,
+      "properties": {
+        "acl": {
+          "anyOf": [
+            {
+              "description": "a Redis ACL rule: words of letters, digits, + - @ ~ * ? : _ . , ! = / ( ) { } [ ] and spaces",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9 +@~*?:_.,!=/(){}\\[\\]-]{1,1024}$"
+            },
+            {
+              "description": "the acl list of a database object, always empty",
+              "type": "array",
+              "maxItems": 0
+            }
+          ]
+        }
+      },
       "minItems": 0,
       "maxItems": 1000,
       "items": {
@@ -45,11 +63,29 @@
       "minProperties": 0,
       "maxProperties": 300,
       "patternProperties": {
-        "^[A-Za-z0-9_.-]{1,64}$": {
+        "^(?!acl$)[A-Za-z0-9_.-]{1,64}$": {
           "$ref": "#/definitions/level_3"
         }
       },
       "additionalProperties": false,
+      "properties": {
+        "acl": {
+          "anyOf": [
+            {
+              "description": "a Redis ACL rule: words of letters, digits, + - @ ~ * ? : _ . , ! = / ( ) { } [ ] and spaces",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9 +@~*?:_.,!=/(){}\\[\\]-]{1,1024}$"
+            },
+            {
+              "description": "the acl list of a database object, always empty",
+              "type": "array",
+              "maxItems": 0
+            }
+          ]
+        }
+      },
       "minItems": 0,
       "maxItems": 500,
       "items": {

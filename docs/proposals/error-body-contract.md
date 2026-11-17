@@ -1,6 +1,9 @@
 # הצעה: חוזה גוף השגיאה של cluster-client
 
-**סטטוס:** לביצוע. ההוראות מיועדות לסוכן שיתקן את הקוד.
+**סטטוס:** מומש (2026-11-13), ועודכן ב-2026-11-17. המסמך היסטורי, והמצב הנוכחי מתואר ב-`AGENTS.md`. מה שהשתנה מאז:
+המגבלות הן 256 ולא 512, והן לא בקונפיג: הן מחושבות מהסכמה בעלייה (`part_length`, `max_parts` ומגבלת `field`).
+הטסטים בודקים מול `helm/files/response-schema.json` ואין עותק ב-`tests/support/`. `x-edge-cluster-status` נקרא
+עכשיו `x-edge-target-status`.
 **תאריך:** 2026-11-13
 **מקור:** בדיקת e2e מלאה (service → DataPower stand-in → cluster-client → Redis Enterprise 8.2.0-25), ב-redis-enterprise-services.
 

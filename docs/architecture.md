@@ -47,13 +47,13 @@ Step by step (`app/routes/target_routes.py`, `target_endpoint`, is the orchestra
 2. `require_access` checks `authorization` before the body is read (`app/access.py`). Wrong or missing: 401.
 3. `read_body` reads the raw body. `read_target_request` (`app/routes/read_request.py`) builds a `TargetRequest`:
    method and URL from the own headers, every `x-target-*` header without the prefix. Invalid or refused: 400.
-4. `send_to_target` (`app/target_client.py`) calls the target with `requests` in a worker thread and waits at most
+4. `send_to_target` (`app/target/client.py`) calls the target with `requests` in a worker thread and waits at most
    28 seconds for the whole call. No redirects are followed. TLS certificates are not checked (internal
    certificates). A failure is sorted into 400 (refused before sending), 502 `connection_failed` (surely not sent) or
    504 `timeout` (maybe done).
-5. `build_response` (`app/response_builder.py`): an empty body is returned as is. Otherwise the body must be standard
-   JSON, the ignored fields are removed (`app/field_paths.py`), and the rest must match the schema
-   (`app/schema.py`). If it does, the target's answer is returned: byte for byte when nothing was removed,
+5. `build_response` (`app/target/response_builder.py`): an empty body is returned as is. Otherwise the body must be standard
+   JSON, the ignored fields are removed (`app/rules/field_paths.py`), and the rest must match the schema
+   (`app/rules/schema.py`). If it does, the target's answer is returned: byte for byte when nothing was removed,
    re-encoded otherwise. If not: 502 `response_rejected`.
 6. Any failure of steps 4 and 5 goes to `failed_request_answer` (`app/failures/answers.py`): it writes the whole
    error to the failure file and builds the error body, cut to the schema's limits. Failures of steps 2 and 3, a
@@ -90,8 +90,10 @@ every failure into a DataPower block, and the manager would see nothing useful.
 
 ![Modules](diagrams/class-diagram.drawio.png)
 
-The rows are the import layers enforced by `lint-imports` (`pyproject.toml`). A module imports only from the rows
-below it. The full file map, with every function, is in [AGENTS.md](../AGENTS.md).
+The modules are grouped by topic: `rules/` (the three JSON files: loading them and checking an answer against them),
+`target/` (calling the target and building the answer from its reply), `routes/`, `failures/`, `logger/` and
+`config/`; `main`, `server`, `telemetry`, `access`, `models` and `errors` stay at the top. The rows are the import
+layers enforced by `lint-imports` (`pyproject.toml`). A module imports only from the rows below it. The full file map, with every function, is in [AGENTS.md](../AGENTS.md).
 
 ## Deployment
 

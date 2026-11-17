@@ -59,7 +59,7 @@
             <mxGeometry height="53" width="53" x="1139" y="1188" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="error_body_limits(schema)&#xa;maxLength of $.error, $.rule, $.field, $.reason[*]; maxItems of $.reason&#xa;the smallest over $ref / anyOf / oneOf / allOf branches&#xa;&lt;i&gt;app/schema_limits.py&lt;/i&gt;" mermaidId="n:limits" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="error_body_limits(schema)&#xa;maxLength of $.error, $.rule, $.field, $.reason[*]; maxItems of $.reason&#xa;the smallest over $ref / anyOf / oneOf / allOf branches&#xa;&lt;i&gt;app/schema_limits.py&lt;/i&gt;" id="13">
+        <UserObject label="error_body_limits(schema)&#xa;maxLength of $.error, $.rule, $.field, $.reason[*]; maxItems of $.reason&#xa;the smallest over $ref / anyOf / oneOf / allOf branches&#xa;&lt;i&gt;app/rules/schema_limits.py&lt;/i&gt;" mermaidId="n:limits" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="error_body_limits(schema)&#xa;maxLength of $.error, $.rule, $.field, $.reason[*]; maxItems of $.reason&#xa;the smallest over $ref / anyOf / oneOf / allOf branches&#xa;&lt;i&gt;app/rules/schema_limits.py&lt;/i&gt;" id="13">
           <mxCell parent="1" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
             <mxGeometry height="112" width="577" x="1039" y="1310" as="geometry" />
           </mxCell>

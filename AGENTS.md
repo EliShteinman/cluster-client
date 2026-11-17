@@ -43,7 +43,7 @@ visible call. Diagram: `docs/diagrams/flow.drawio.png`; every failure: `docs/fai
    `HTTPException` whose `loc` names the header (`named_by_header`, `read_request.py:58`). A header that is exactly
    `x-target-`, or one in `headers.refused_target_headers` → `HTTPException` with `headers.refused_reason`. Both →
    `refused_request_response` → **400** `invalid_request`. Nothing is sent.
-5. **Send.** `send_to_target` (`app/target_client.py:22`) runs `call_target` (`:44`, `requests.request` with
+5. **Send.** `send_to_target` (`app/target/client.py:22`) runs `call_target` (`:44`, `requests.request` with
    `timeout=(connect_timeout_seconds, timeout_seconds)`, `allow_redirects=False`, `verify=False`) in a
    one-thread pool inside `copy_context()`, and waits at most `forwarding.timeout_seconds` (28) for the whole call.
    - waiting too long → `NoResponseError` (**504** `timeout`, maybe done);
@@ -53,16 +53,16 @@ visible call. Diagram: `docs/diagrams/flow.drawio.png`; every failure: `docs/fai
      `connection_failed`); anything else (read timeout, connection cut, any TLS error) → `NoResponseError` (**504**).
    - the answer → `Answer` with the target's status, `returned_headers` (`:73`: without
      `forwarding.recomputed_response_headers` and without any `x-edge-*` header) and content.
-6. **Check.** `build_response` (`app/response_builder.py:17`):
+6. **Check.** `build_response` (`app/target/response_builder.py:17`):
    - empty body (e.g. 204) → returned as is, unchecked;
-   - `read_json_body` (`app/json_reading.py:20`): not JSON, or `NaN`/`Infinity` (`refuse_constant`) →
+   - `read_json_body` (`app/rules/json_reading.py:20`): not JSON, or `NaN`/`Infinity` (`refuse_constant`) →
      `ResponseRejectedError`, rule `failures.not_json_rule`, field `$`;
-   - `remove_fields` (`app/field_paths.py:44`) removes the ignored fields; it copies only along the removed paths
+   - `remove_fields` (`app/rules/field_paths.py:44`) removes the ignored fields; it copies only along the removed paths
      and returns the same object when nothing was removed;
-   - `validate_body` (`app/schema.py:32`): `best_match` of the schema's errors; a violation → `ResponseRejectedError`
+   - `validate_body` (`app/rules/schema.py:32`): `best_match` of the schema's errors; a violation → `ResponseRejectedError`
      with `rule` = the keyword and `field` = its `json_path`, and `reason` from `violation_at` (`:54`) on a copy without
      the redacted fields, else `failures.redacted_reason`. The original message is logged at DEBUG (`:42`);
-   - a body too deep for Python (`RecursionError`) at either step → `too_deep` (`:46`), rule `too_deep`;
+   - a body too deep for Python (`RecursionError`) at either step → `too_deep` (`app/target/response_builder.py:46`), rule `too_deep`;
    - nothing removed → the **original** `Answer` object; else the body is re-encoded (`json.dumps`,
      `ensure_ascii=False`).
    All these are **502** `response_rejected`.
@@ -93,11 +93,11 @@ Diagram: `docs/diagrams/startup.drawio.png`.
    `health_router`, `build_target_router` (`target_routes.py:24`, with the OpenAPI of `target_openapi.py`).
 3. `serve` (`app/server.py:9`) → `uvicorn.run` (`log_config=None`, no `server`/`date` headers).
 4. `lifespan` (`app/main.py:57`): `configure_logging`, `start_telemetry`, then
-   `app.state.rules = load_rules(...)` (`app/rules.py:24`):
-   - `load_schema` (`app/schema.py:19`): a JSON object, `validator_for` (the draft it declares), `check_schema`;
-   - `load_field_paths` (`app/field_paths.py:21`) twice: a JSON list of strings, each parsed by `parse_field_path`
+   `app.state.rules = load_rules(...)` (`app/rules/response_rules.py:24`):
+   - `load_schema` (`app/rules/schema.py:19`): a JSON object, `validator_for` (the draft it declares), `check_schema`;
+   - `load_field_paths` (`app/rules/field_paths.py:21`) twice: a JSON list of strings, each parsed by `parse_field_path`
      (`:33`); a path ending in `[*]` is refused;
-   - `error_body_limits` (`app/schema_limits.py:19`): the smallest `maxLength` of `$.error`, `$.rule`, `$.field`,
+   - `error_body_limits` (`app/rules/schema_limits.py:19`): the smallest `maxLength` of `$.error`, `$.rule`, `$.field`,
      `$.reason[*]` and `maxItems` of `$.reason` over every branch (`nodes_at`, `with_alternatives`: `$ref` inside
      the file, `anyOf`/`oneOf`/`allOf`, `properties`/`patternProperties`/`additionalProperties`,
      `items`/`additionalItems`). No limit → `SchemaLoadError`; a `$ref` loop (`RecursionError`) → "the schema refers
@@ -118,13 +118,13 @@ Diagram: `docs/diagrams/startup.drawio.png`.
 | `app/server.py` | `serve(app, settings)` → `uvicorn.run` |
 | `app/telemetry.py` | `build_tracer_provider` (OTLP exporter only when `telemetry.export_enabled`), `start_telemetry` (`LoggingInstrumentor` with `enable_log_auto_instrumentation=False`, `TraceResponsePropagator`, `RequestsInstrumentor`), `stop_telemetry` |
 | `app/access.py` | `check_access(header_value, settings)` and `expected_credentials(settings)`: not decorated, they hold the password; `login_challenge(settings)`: the `www-authenticate` value, used by the 401 handler and by `/docs` |
-| `app/target_client.py` | `send_to_target` (total timeout, `@log_info` only), `call_target` (not decorated), `classified_error`, `was_not_sent`, `returned_headers`; `urllib3.disable_warnings(InsecureRequestWarning)` at import |
-| `app/response_builder.py` | `build_response(target_response, rules, settings)`, `too_deep(settings)` |
-| `app/rules.py` | `ResponseRules` (`schema_validator`, `ignored_fields`, `redacted_fields`, `error_limits`), `load_rules(settings)` |
-| `app/schema.py` | `load_schema(path)`, `validate_body(body, schema, redacted_fields, redacted_reason)`, `violation_at`, `every_error` (looks into `anyOf` context), `first_violation` (used by the startup check) |
-| `app/schema_limits.py` | `error_body_limits(schema, path)`, `smallest_limit`, `nodes_at`, `with_alternatives`, `referenced`, `children`, `property_schemas`, `item_schemas`, `schema_list`; `SchemaNode` |
-| `app/field_paths.py` | `FieldPath`, `ROOT` (`$`), `ALL_ITEMS` (`[*]`), `load_field_paths(path)`, `parse_field_path(field, path)`, `remove_fields(body, field_paths)`, `without_field`, `without_field_in_items` |
-| `app/json_reading.py` | `read_json_file(path, error)` (one of the runtime files; raises the given `ConfigFileLoadError`), `read_json_body(content)` (strict: `NaN`/`Infinity` refused by `refuse_constant`) |
+| `app/target/client.py` | `send_to_target` (total timeout, `@log_info` only), `call_target` (not decorated), `classified_error`, `was_not_sent`, `returned_headers`; `urllib3.disable_warnings(InsecureRequestWarning)` at import |
+| `app/target/response_builder.py` | `build_response(target_response, rules, settings)`, `too_deep(settings)` |
+| `app/rules/response_rules.py` | `ResponseRules` (`schema_validator`, `ignored_fields`, `redacted_fields`, `error_limits`), `load_rules(settings)` |
+| `app/rules/schema.py` | `load_schema(path)`, `validate_body(body, schema, redacted_fields, redacted_reason)`, `violation_at`, `every_error` (looks into `anyOf` context), `first_violation` (used by the startup check) |
+| `app/rules/schema_limits.py` | `error_body_limits(schema, path)`, `smallest_limit`, `nodes_at`, `with_alternatives`, `referenced`, `children`, `property_schemas`, `item_schemas`, `schema_list`; `SchemaNode` |
+| `app/rules/field_paths.py` | `FieldPath`, `ROOT` (`$`), `ALL_ITEMS` (`[*]`), `load_field_paths(path)`, `parse_field_path(field, path)`, `remove_fields(body, field_paths)`, `without_field`, `without_field_in_items` |
+| `app/rules/json_reading.py` | `read_json_file(path, error)` (one of the runtime files; raises the given `ConfigFileLoadError`), `read_json_body(content)` (strict: `NaN`/`Infinity` refused by `refuse_constant`) |
 | `app/models.py` | `FrozenModel`; `checked_http_url` (an `AnyHttpUrl` check that keeps the URL as received); `TargetRequest` (`method`: an HTTP token; `url`; `headers`, `repr=False`; `body`); `Answer` (status, headers, content: the target's answer or one the service writes); `FailureBody` (`error`, `rule`, `field`, `reason: list[str]`, with the descriptions `/docs` shows); `FailureDetails` (the same, `reason: str`, whole) → `FailureRecord` (+ `method`, `url`, `target_status_code`, `target_response`); `ErrorBodyLimits`; `HealthStatus` |
 | `app/errors.py` | `ClusterClientError` → `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `NonStandardJsonError` (also a `ValueError`), `AccessDeniedError`, `RequestFailedError(reason, field, rule)` → `TargetUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `InvalidTargetRequestError`, `ResponseRejectedError` |
 | `app/routes/target_routes.py` | `build_target_router(settings)`, `require_access(request)`, `target_endpoint(request, body)` |
@@ -192,7 +192,7 @@ Diagram: `docs/diagrams/startup.drawio.png`.
    concept; inherit where models share fields.
 8. **Tools must pass**: `uv run ruff check .` and `uv run ruff format .` (line length 110),
    `uv run basedpyright` (strict, on `app`, `tests`, `docker`, `run_local.py`), `uv run lint-imports` (layers in
-   `pyproject.toml`; a new module needs a layer), `uv run pytest`. Pre-commit runs the first four.
+   `pyproject.toml`: `app`, and inside it `app.rules`, `app.target` and `app.config`; a new module needs a layer), `uv run pytest`. Pre-commit runs the first four.
 
 ## Decisions that look odd but are deliberate
 
@@ -318,13 +318,14 @@ Keep every one of these. Do not "fix" them without the owner.
   coverage gate. One assertion and one behaviour per test.
 - **Test only this project's logic. Never test library behaviour** (Pydantic validation, env parsing, logging
   propagation, SecretStr masking...). Ask: "if this fails, is the bug in our code?" If not, do not write it.
-- The target is faked by replacing `app.target_client.requests.request` (`tests/support/fake_target_api.py`, the
+- The target is faked by replacing `app.target.client.requests.request` (`tests/support/fake_target_api.py`, the
   `fake_target` fixture in `tests/conftest.py`).
 - The schema and the field files are the real ones in `helm/files/` (`tests/support/rules.py`, `RULES`); small test
   schemas declare draft-04 and go through `validator_for` like the code.
-- `tests/support/cluster_samples/`: 43 real Redis Enterprise answers, passwords replaced; `tests/unit/test_samples.py`
+- `tests/support/cluster_samples/`: 43 real Redis Enterprise answers, passwords replaced; `tests/unit/rules/test_samples.py`
   runs every one through the real files.
-- Layout: `tests/unit/` mirrors `app/` (`config/`, `routes/`, one file per module or concept). 224 tests today.
+- Layout: `tests/unit/` mirrors `app/`: `config/`, `routes/`, `rules/`, `target/`, `failures/`, `logger/`, and `test_access.py`
+  for the top-level `access.py`; one file per module or concept. 231 tests today.
 - Run: `uv run pytest`.
 
 ## Diagrams and docs

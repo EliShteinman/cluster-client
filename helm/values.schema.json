@@ -252,13 +252,6 @@
     }
   },
   "$defs": {
-    "boolean": {
-      "type": "string",
-      "enum": [
-        "true",
-        "false"
-      ]
-    },
     "logLevel": {
       "type": "string",
       "enum": [
@@ -269,56 +262,9 @@
         "DEBUG"
       ]
     },
-    "logFormat": {
-      "type": "string",
-      "enum": [
-        "line",
-        "json"
-      ]
-    },
-    "headerName": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9!#$%&'*+.^_`|~-]+$"
-    },
-    "headerNames": {
-      "type": "string",
-      "pattern": "^\\[\\s*(\"[A-Za-z0-9!#$%&'*+.^_`|~-]+\"\\s*(,\\s*\"[A-Za-z0-9!#$%&'*+.^_`|~-]+\"\\s*)*)?\\]$"
-    },
-    "errorStatusCode": {
-      "type": "string",
-      "pattern": "^[45][0-9]{2}$"
-    },
-    "errorCode": {
-      "type": "string",
-      "pattern": "^[a-z][a-z_]*$"
-    },
-    "mediaType": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+$"
-    },
-    "positiveNumber": {
-      "type": "string",
-      "pattern": "^(0\\.[0-9]*[1-9][0-9]*|[1-9][0-9]*(\\.[0-9]+)?)$"
-    },
-    "positiveInteger": {
-      "type": "string",
-      "pattern": "^[1-9][0-9]*$"
-    },
-    "nonNegativeInteger": {
-      "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$"
-    },
     "absolutePath": {
       "type": "string",
       "pattern": "^/[^\\s]*$"
-    },
-    "loggerName": {
-      "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
-    },
-    "text": {
-      "type": "string",
-      "minLength": 1
     },
     "quantity": {
       "type": "string",
@@ -330,219 +276,19 @@
       "maximum": 65535
     },
     "environment": {
+      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value when it starts (README, Configuration). The image sets the host and port.",
       "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "CLUSTER_CLIENT_SERVER__SERVER_HEADER": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_SERVER__DATE_HEADER": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_APPLICATION__TITLE": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_ACCESS__HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_ACCESS__SCHEME": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_ACCESS__USERNAME": {
-          "type": "string",
-          "pattern": "^[^:]+$"
-        },
-        "CLUSTER_CLIENT_ACCESS__PASSWORD": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_ACCESS__CHALLENGE_HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_ACCESS__REALM": {
-          "type": "string",
-          "pattern": "^[^\"]+$"
-        },
-        "CLUSTER_CLIENT_HEADERS__METHOD": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_HEADERS__URL": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_HEADERS__AUTHORIZATION": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_HEADERS__CONTENT_TYPE": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH": {
-          "$ref": "#/$defs/absolutePath"
-        },
-        "CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH": {
-          "$ref": "#/$defs/absolutePath"
-        },
-        "CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH": {
-          "$ref": "#/$defs/absolutePath"
-        },
-        "CLUSTER_CLIENT_FORWARDING__CONNECT_TIMEOUT_SECONDS": {
-          "$ref": "#/$defs/positiveNumber"
-        },
-        "CLUSTER_CLIENT_FORWARDING__TIMEOUT_SECONDS": {
-          "$ref": "#/$defs/positiveNumber"
-        },
-        "CLUSTER_CLIENT_FORWARDING__AUTHORIZATION_HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_FORWARDING__CONTENT_TYPE_HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_FORWARDING__PASSED_THROUGH_REQUEST_HEADERS": {
-          "$ref": "#/$defs/headerNames"
-        },
-        "CLUSTER_CLIENT_FORWARDING__RECOMPUTED_RESPONSE_HEADERS": {
-          "$ref": "#/$defs/headerNames"
-        },
-        "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__UNAUTHORIZED__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__CONNECTION_FAILED__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__INTERNAL_ERROR__STATUS_CODE": {
-          "$ref": "#/$defs/errorStatusCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__INVALID_REQUEST__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__UNAUTHORIZED__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__REJECTED__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__CONNECTION_FAILED__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__NO_RESPONSE__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__INTERNAL_ERROR__ERROR_CODE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__ERROR_HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_FAILURES__CLUSTER_STATUS_HEADER": {
-          "$ref": "#/$defs/headerName"
-        },
-        "CLUSTER_CLIENT_FAILURES__CONTENT_TYPE": {
-          "$ref": "#/$defs/mediaType"
-        },
-        "CLUSTER_CLIENT_FAILURES__PART_LENGTH": {
-          "$ref": "#/$defs/positiveInteger"
-        },
-        "CLUSTER_CLIENT_FAILURES__MAX_PARTS": {
-          "type": "string",
-          "pattern": "^([2-9]|[1-9][0-9]+)$"
-        },
-        "CLUSTER_CLIENT_FAILURES__SHORTENED_FIELD_PREFIX": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_FAILURES__UNSENT_CHARACTERS_MESSAGE": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_FAILURES__NOT_JSON_RULE": {
-          "$ref": "#/$defs/errorCode"
-        },
-        "CLUSTER_CLIENT_FAILURES__NOT_JSON_REASON": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_FAILURES__REDACTED_REASON": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_LOG__LEVEL": {
-          "$ref": "#/$defs/logLevel"
-        },
-        "CLUSTER_CLIENT_LOG__QUIET_PATHS": {
-          "$ref": "#/$defs/paths"
-        },
-        "CLUSTER_CLIENT_LOG__QUIET_KEPT_LEVEL": {
-          "$ref": "#/$defs/logLevel"
-        },
-        "CLUSTER_CLIENT_LOG__CONSOLE__ENABLED": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_LOG__CONSOLE__LEVEL": {
-          "$ref": "#/$defs/logLevel"
-        },
-        "CLUSTER_CLIENT_LOG__CONSOLE__FORMAT": {
-          "$ref": "#/$defs/logFormat"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__ENABLED": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__LEVEL": {
-          "$ref": "#/$defs/logLevel"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__FORMAT": {
-          "$ref": "#/$defs/logFormat"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__PATH": {
-          "$ref": "#/$defs/absolutePath"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__MAX_BYTES": {
-          "$ref": "#/$defs/positiveInteger"
-        },
-        "CLUSTER_CLIENT_LOG__FILE__BACKUP_COUNT": {
-          "$ref": "#/$defs/nonNegativeInteger"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__ENABLED": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__LEVEL": {
-          "$ref": "#/$defs/logLevel"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__FORMAT": {
-          "$ref": "#/$defs/logFormat"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH": {
-          "$ref": "#/$defs/absolutePath"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__MAX_BYTES": {
-          "$ref": "#/$defs/positiveInteger"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__BACKUP_COUNT": {
-          "$ref": "#/$defs/nonNegativeInteger"
-        },
-        "CLUSTER_CLIENT_LOG__FAILURE_FILE__LOGGER_NAME": {
-          "$ref": "#/$defs/loggerName"
-        },
-        "CLUSTER_CLIENT_LOG__FORMATTING__LINE_PATTERN": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_LOG__FORMATTING__DATE_FORMAT": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_TELEMETRY__SERVICE_NAME": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED": {
-          "$ref": "#/$defs/boolean"
-        },
-        "CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT": {
-          "$ref": "#/$defs/text"
-        },
-        "CLUSTER_CLIENT_TELEMETRY__TRACES_PATH": {
-          "$ref": "#/$defs/text"
+      "propertyNames": {
+        "pattern": "^CLUSTER_CLIENT_[A-Z0-9_]+$",
+        "not": {
+          "enum": [
+            "CLUSTER_CLIENT_SERVER__HOST",
+            "CLUSTER_CLIENT_SERVER__PORT"
+          ]
         }
+      },
+      "additionalProperties": {
+        "type": "string"
       }
     },
     "dnsLabel": {
@@ -597,10 +343,6 @@
           }
         }
       }
-    },
-    "paths": {
-      "type": "string",
-      "pattern": "^\\[\\s*(\"/[^\"\\s]*\"\\s*(,\\s*\"/[^\"\\s]*\"\\s*)*)?\\]$"
     }
   }
 }

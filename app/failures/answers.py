@@ -9,9 +9,9 @@ from app.config.settings import Settings
 from app.errors import ConnectionFailedError, InvalidTargetRequestError, NoResponseError, RequestFailedError
 from app.failures.body import failure_body
 from app.field_paths import FieldPath, remove_fields
-from app.json_file import read_json_body
+from app.json_reading import read_json_body
 from app.logger.decorators import log_debug
-from app.models import ErrorBodyLimits, FailureDetails, RequestFailure, TargetRequest, TargetResponse
+from app.models import Answer, ErrorBodyLimits, FailureDetails, FailureRecord, TargetRequest
 from app.rules import ResponseRules
 
 
@@ -20,12 +20,12 @@ def failed_request_answer(
     *,
     request: TargetRequest,
     failure: RequestFailedError,
-    target_response: TargetResponse | None,
+    target_response: Answer | None,
     rules: ResponseRules,
     settings: Settings,
-) -> TargetResponse:
+) -> Answer:
     code: FailureCode = failure_code(failure=failure, settings=settings.failures)
-    record: RequestFailure = request_failure(
+    record: FailureRecord = failure_record(
         request=request,
         failure=failure,
         error_code=code.error_code,
@@ -60,15 +60,20 @@ def failure_code(*, failure: RequestFailedError, settings: FailureSettings) -> F
 
 
 @log_debug
-def request_failure(
+def failure_codes(*, settings: FailureSettings) -> list[FailureCode]:
+    return [code for _, code in settings if isinstance(code, FailureCode)]
+
+
+@log_debug
+def failure_record(
     *,
     request: TargetRequest,
     failure: RequestFailedError,
     error_code: str,
-    target_response: TargetResponse | None,
+    target_response: Answer | None,
     redacted_fields: tuple[FieldPath, ...],
-) -> RequestFailure:
-    return RequestFailure(
+) -> FailureRecord:
+    return FailureRecord(
         error=error_code,
         rule=failure.rule,
         field=failure.field,
@@ -103,11 +108,11 @@ def logged_answer(
     limits: ErrorBodyLimits,
     settings: Settings,
     extra_headers: dict[str, str],
-) -> TargetResponse:
+) -> Answer:
     logging.getLogger(name=settings.log.failure_file.logger_name).log(
         level=level, msg=message, extra=details.model_dump(mode="json")
     )
-    return TargetResponse(
+    return Answer(
         status_code=code.status_code,
         headers={
             settings.failures.content_type_header: settings.failures.content_type,

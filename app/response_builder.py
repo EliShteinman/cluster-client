@@ -6,17 +6,15 @@ from app.config.constants import TEXT_ENCODING
 from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
 from app.field_paths import ROOT, remove_fields
-from app.json_file import read_json_body
+from app.json_reading import read_json_body
 from app.logger.decorators import log_debug
-from app.models import TargetResponse
+from app.models import Answer
 from app.rules import ResponseRules
 from app.schema import validate_body
 
 
 @log_debug
-def build_response(
-    *, target_response: TargetResponse, rules: ResponseRules, settings: FailureSettings
-) -> TargetResponse:
+def build_response(*, target_response: Answer, rules: ResponseRules, settings: FailureSettings) -> Answer:
     if not target_response.content:
         return target_response
     try:

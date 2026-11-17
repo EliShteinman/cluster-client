@@ -16,23 +16,30 @@ def log_debug[**P, R](function: Callable[P, R]) -> Callable[P, R]:
     logger: logging.Logger = logging.getLogger(name=function.__module__)
     name: str = function.__qualname__
 
+    def when_debug(*, hook: CallHook) -> CallHook:
+        def guarded(**details: object) -> None:
+            if logger.isEnabledFor(level=logging.DEBUG):
+                hook(**details)
+
+        return guarded
+
     def on_call(*, arguments: dict[str, object]) -> None:
-        if logger.isEnabledFor(level=logging.DEBUG):
-            logger.debug(msg=f"{name} called with {arguments!r}")
+        logger.debug(msg=f"{name} called with {arguments!r}")
 
     def on_return(*, arguments: dict[str, object], result: object, duration_ms: float) -> None:
-        if logger.isEnabledFor(level=logging.DEBUG):
-            logger.debug(
-                msg=f"{name} returned {result!r} in {duration_ms} ms", extra={"duration_ms": duration_ms}
-            )
+        logger.debug(
+            msg=f"{name} returned {result!r} in {duration_ms} ms", extra={"duration_ms": duration_ms}
+        )
 
     def on_error(*, arguments: dict[str, object], error: Exception, duration_ms: float) -> None:
-        if logger.isEnabledFor(level=logging.DEBUG):
-            logger.debug(
-                msg=f"{name} raised {error!r} in {duration_ms} ms", extra={"duration_ms": duration_ms}
-            )
+        logger.debug(msg=f"{name} raised {error!r} in {duration_ms} ms", extra={"duration_ms": duration_ms})
 
-    return wrap_call(function=function, on_call=on_call, on_return=on_return, on_error=on_error)
+    return wrap_call(
+        function=function,
+        on_call=when_debug(hook=on_call),
+        on_return=when_debug(hook=on_return),
+        on_error=when_debug(hook=on_error),
+    )
 
 
 def log_info[**P, R](
@@ -41,9 +48,6 @@ def log_info[**P, R](
     def decorate(function: Callable[P, R]) -> Callable[P, R]:
         logger: logging.Logger = logging.getLogger(name=function.__module__)
         name: str = function.__qualname__
-
-        def on_call(*, arguments: dict[str, object]) -> None:
-            pass
 
         def on_return(*, arguments: dict[str, object], result: object, duration_ms: float) -> None:
             picked_inputs: dict[str, object] = pick_inputs(arguments=arguments, paths=inputs)
@@ -63,7 +67,7 @@ def log_info[**P, R](
                 extra={"inputs": picked_inputs, "error": type(error).__name__, "duration_ms": duration_ms},
             )
 
-        return wrap_call(function=function, on_call=on_call, on_return=on_return, on_error=on_error)
+        return wrap_call(function=function, on_call=None, on_return=on_return, on_error=on_error)
 
     return decorate
 
@@ -90,7 +94,7 @@ def joined(*, values: dict[str, object]) -> str:
 
 
 def wrap_call[**P, R](
-    *, function: Callable[P, R], on_call: CallHook, on_return: CallHook, on_error: CallHook
+    *, function: Callable[P, R], on_call: CallHook | None, on_return: CallHook, on_error: CallHook
 ) -> Callable[P, R]:
     signature: inspect.Signature = inspect.signature(obj=function)
 
@@ -107,7 +111,8 @@ def wrap_call[**P, R](
         @functools.wraps(wrapped=function)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> object:
             arguments: dict[str, object] = arguments_of(*args, **kwargs)
-            on_call(arguments=arguments)
+            if on_call is not None:
+                on_call(arguments=arguments)
             started: float = time.perf_counter()
             try:
                 result: object = await coroutine_function(*args, **kwargs)
@@ -122,7 +127,8 @@ def wrap_call[**P, R](
     @functools.wraps(wrapped=function)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         arguments: dict[str, object] = arguments_of(*args, **kwargs)
-        on_call(arguments=arguments)
+        if on_call is not None:
+            on_call(arguments=arguments)
         started: float = time.perf_counter()
         try:
             result: R = function(*args, **kwargs)

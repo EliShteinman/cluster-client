@@ -4,19 +4,20 @@ import traceback
 from fastapi import Request, Response
 from starlette.exceptions import HTTPException
 
+from app.access import login_challenge
 from app.config.failures import FailureCode
 from app.config.settings import Settings
 from app.errors import AccessDeniedError
 from app.failures.answers import logged_answer
 from app.logger.decorators import log_debug
-from app.models import FailureDetails, TargetResponse
+from app.models import Answer, FailureDetails
 from app.rules import ResponseRules
 
 
 @log_debug
 def refused_request_response(request: Request, error: HTTPException) -> Response:
     settings: Settings = request.app.state.settings
-    answer: TargetResponse = own_failure_answer(
+    answer: Answer = own_failure_answer(
         request=request,
         code=settings.failures.invalid_request,
         reason=str(object=error.detail),
@@ -32,12 +33,10 @@ def refused_request_response(request: Request, error: HTTPException) -> Response
 @log_debug
 def access_denied_response(request: Request, error: AccessDeniedError) -> Response:
     settings: Settings = request.app.state.settings
-    answer: TargetResponse = own_failure_answer(
+    answer: Answer = own_failure_answer(
         request=request, code=settings.failures.unauthorized, reason=str(object=error), level=logging.WARNING
     )
-    challenge: dict[str, str] = {
-        settings.access.challenge_header: f'{settings.access.scheme} realm="{settings.access.realm}"'
-    }
+    challenge: dict[str, str] = {settings.access.challenge_header: login_challenge(settings=settings.access)}
     return Response(
         content=answer.content, status_code=answer.status_code, headers={**answer.headers, **challenge}
     )
@@ -46,7 +45,7 @@ def access_denied_response(request: Request, error: AccessDeniedError) -> Respon
 @log_debug
 def internal_error_response(request: Request, error: Exception) -> Response:
     settings: Settings = request.app.state.settings
-    answer: TargetResponse = own_failure_answer(
+    answer: Answer = own_failure_answer(
         request=request,
         code=settings.failures.internal_error,
         reason="".join(traceback.format_exception(error)),
@@ -56,7 +55,7 @@ def internal_error_response(request: Request, error: Exception) -> Response:
 
 
 @log_debug
-def own_failure_answer(*, request: Request, code: FailureCode, reason: str, level: int) -> TargetResponse:
+def own_failure_answer(*, request: Request, code: FailureCode, reason: str, level: int) -> Answer:
     settings: Settings = request.app.state.settings
     rules: ResponseRules = request.app.state.rules
     return logged_answer(

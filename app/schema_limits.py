@@ -44,26 +44,26 @@ def smallest_limit(*, schema: SchemaNode, field: str, keyword: str, path: Path) 
 
 @log_debug
 def nodes_at(*, schema: SchemaNode, field_path: FieldPath) -> list[SchemaNode]:
-    nodes: list[SchemaNode] = expanded(schema=schema, node=schema)
+    nodes: list[SchemaNode] = with_alternatives(schema=schema, node=schema)
     for step in field_path:
         nodes = [
             found
             for node in nodes
             for child in children(node=node, step=step)
-            for found in expanded(schema=schema, node=child)
+            for found in with_alternatives(schema=schema, node=child)
         ]
     return nodes
 
 
 @log_debug
-def expanded(*, schema: SchemaNode, node: SchemaNode) -> list[SchemaNode]:
+def with_alternatives(*, schema: SchemaNode, node: SchemaNode) -> list[SchemaNode]:
     found: list[SchemaNode] = [node]
     reference: JsonValue = node.get("$ref")
     if isinstance(reference, str):
-        found += expanded(schema=schema, node=referenced(schema=schema, reference=reference))
+        found += with_alternatives(schema=schema, node=referenced(schema=schema, reference=reference))
     for keyword in BRANCH_KEYWORDS:
         for branch in schema_list(value=node.get(keyword)):
-            found += expanded(schema=schema, node=branch)
+            found += with_alternatives(schema=schema, node=branch)
     return found
 
 
@@ -108,7 +108,6 @@ def item_schemas(*, node: SchemaNode) -> list[SchemaNode]:
     additional: JsonValue = node.get("additionalItems")
     return [
         *schema_list(value=items),
-        *schema_list(value=node.get("prefixItems")),
         *([additional] if isinstance(additional, dict) else []),
     ]
 

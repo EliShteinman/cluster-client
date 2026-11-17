@@ -10,7 +10,7 @@ from app.errors import (
     NoResponseError,
     RequestFailedError,
 )
-from app.models import TargetRequest, TargetResponse
+from app.models import Answer, TargetRequest
 from app.target_client import returned_headers, send_to_target
 from tests.support.fake_target_api import CONNECT_FAILURE, FakeTargetApi, SentRequest
 from tests.support.requests import TARGET_REQUEST, TARGET_URL
@@ -21,7 +21,7 @@ FULL_REQUEST: TargetRequest = TARGET_REQUEST.model_copy(
 )
 
 
-def send(*, request: TargetRequest) -> TargetResponse:
+def send(*, request: TargetRequest) -> Answer:
     return send_to_target(request=request, settings=FORWARDING)
 
 

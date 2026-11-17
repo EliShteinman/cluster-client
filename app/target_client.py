@@ -11,16 +11,15 @@ from app.errors import (
     InvalidTargetRequestError,
     NoResponseError,
     RequestFailedError,
-    TotalTimeoutError,
 )
 from app.logger.decorators import log_debug, log_info
-from app.models import TargetRequest, TargetResponse
+from app.models import Answer, TargetRequest
 
 urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 @log_info(inputs=("request.method", "request.url"), outputs=("status_code",))
-def send_to_target(*, request: TargetRequest, settings: ForwardingSettings) -> TargetResponse:
+def send_to_target(*, request: TargetRequest, settings: ForwardingSettings) -> Answer:
     pool: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1)
     call: Future[requests.Response] = pool.submit(
         copy_context().run, call_target, request=request, settings=settings
@@ -28,12 +27,14 @@ def send_to_target(*, request: TargetRequest, settings: ForwardingSettings) -> T
     try:
         response: requests.Response = call.result(timeout=settings.timeout_seconds)
     except TimeoutError as error:
-        raise TotalTimeoutError(url=request.url, seconds=settings.timeout_seconds) from error
+        raise NoResponseError(
+            url=request.url, reason=f"no full answer within {settings.timeout_seconds} seconds"
+        ) from error
     except requests.RequestException as error:
-        raise unreachable_error(url=request.url, error=error) from error
+        raise classified_error(url=request.url, error=error) from error
     finally:
         pool.shutdown(wait=False)
-    return TargetResponse(
+    return Answer(
         status_code=response.status_code,
         headers=returned_headers(response=response, settings=settings),
         content=response.content,
@@ -53,7 +54,7 @@ def call_target(*, request: TargetRequest, settings: ForwardingSettings) -> requ
 
 
 @log_debug
-def unreachable_error(*, url: str, error: requests.RequestException) -> RequestFailedError:
+def classified_error(*, url: str, error: requests.RequestException) -> RequestFailedError:
     if isinstance(error, ValueError):
         return InvalidTargetRequestError(url=url, reason=str(error))
     if was_not_sent(error=error):

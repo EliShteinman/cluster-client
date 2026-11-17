@@ -4,14 +4,18 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.config.access import AccessSettings
-from app.config.constants import ENV_FILE, ENV_NESTED_DELIMITER, ENV_PREFIX
+from app.config.application import ApplicationSettings
 from app.config.failures import FailureSettings
 from app.config.forwarding import ForwardingSettings
 from app.config.headers import HeaderSettings
 from app.config.logging import LoggingSettings
-from app.config.server import ApplicationSettings, ServerSettings
+from app.config.server import ServerSettings
 from app.config.telemetry import TelemetrySettings
 from app.config.validation import ValidationSettings
+
+ENV_FILE: str = ".env"
+ENV_PREFIX: str = "CLUSTER_CLIENT_"
+ENV_NESTED_DELIMITER: str = "__"
 
 
 class Settings(BaseSettings):

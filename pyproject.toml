@@ -69,11 +69,11 @@ exhaustive = true
 layers = [
     "main | server",
     "routes",
-    "access | failures | response_builder | target_client | telemetry",
-    "rules",
+    "failures | response_builder | target_client | telemetry",
+    "access | rules",
     "schema | schema_limits",
     "field_paths",
-    "models | json_file",
+    "models | json_reading",
     "logger",
     "errors | config",
 ]
@@ -85,7 +85,7 @@ containers = ["app.config"]
 exhaustive = true
 layers = [
     "settings",
-    "server | access | headers | forwarding | validation | failures | logging | telemetry",
+    "server | application | access | headers | forwarding | validation | failures | logging | telemetry",
     "base | field_types",
-    "constants | utils",
+    "constants",
 ]

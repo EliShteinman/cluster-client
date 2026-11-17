@@ -19,10 +19,14 @@ from app.errors import (
     RequestFailedError,
     ResponseRejectedError,
 )
-from app.failures.answers import failed_request_answer, failure_code, redacted_content, request_failure
-from app.failures.handlers import access_denied_response, internal_error_response, refused_request_response
+from app.failures.answers import failed_request_answer, failure_code, failure_record, redacted_content
+from app.failures.exception_handlers import (
+    access_denied_response,
+    internal_error_response,
+    refused_request_response,
+)
 from app.field_paths import FieldPath
-from app.models import RequestFailure, TargetResponse
+from app.models import Answer, FailureRecord
 from app.schema import validate_body
 from tests.support.access import ACCESS
 from tests.support.requests import TARGET_REQUEST, TARGET_URL
@@ -34,7 +38,7 @@ NO_RESPONSE: NoResponseError = NoResponseError(url=TARGET_URL, reason="read time
 REJECTION: ResponseRejectedError = ResponseRejectedError(
     field="$.uid", reason="'one' is not of type 'integer'"
 )
-TARGET_RESPONSE: TargetResponse = TargetResponse(status_code=200, content=b'{"uid": "one"}')
+TARGET_RESPONSE: Answer = Answer(status_code=200, content=b'{"uid": "one"}')
 REDACT_PASSWORD: tuple[FieldPath, ...] = (("password",),)
 REQUEST: Request = Request(
     scope={
@@ -82,16 +86,16 @@ def raised_error(*, message: str = "disk is full") -> ValueError:
         return error
 
 
-def content_of(*, answer: TargetResponse | Response) -> bytes:
-    return answer.content if isinstance(answer, TargetResponse) else bytes(answer.body)
+def content_of(*, answer: Answer | Response) -> bytes:
+    return answer.content if isinstance(answer, Answer) else bytes(answer.body)
 
 
 def reason_of(*, response: Response) -> str:
     return "".join(json.loads(s=bytes(response.body))["reason"])
 
 
-def record_of(*, failure: RequestFailedError) -> RequestFailure:
-    return request_failure(
+def record_of(*, failure: RequestFailedError) -> FailureRecord:
+    return failure_record(
         request=TARGET_REQUEST,
         failure=failure,
         error_code="response_rejected",
@@ -100,8 +104,8 @@ def record_of(*, failure: RequestFailedError) -> RequestFailure:
     )
 
 
-def record(*, target_response: TargetResponse | None) -> RequestFailure:
-    return request_failure(
+def record(*, target_response: Answer | None) -> FailureRecord:
+    return failure_record(
         request=TARGET_REQUEST,
         failure=REJECTION,
         error_code="response_rejected",
@@ -124,8 +128,8 @@ def test_each_failure_gets_its_configured_code(failure: RequestFailedError, erro
 
 
 def test_record_leaves_out_the_redacted_fields() -> None:
-    failure: RequestFailure = record(
-        target_response=TargetResponse(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
+    failure: FailureRecord = record(
+        target_response=Answer(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
     )
 
     assert json.loads(s=failure.target_response or "") == {"uid": "one"}
@@ -149,7 +153,7 @@ def test_response_uses_the_configured_status_code() -> None:
 
 
 def test_response_is_marked_with_the_error_code() -> None:
-    response: TargetResponse = failed_request_answer(
+    response: Answer = failed_request_answer(
         request=TARGET_REQUEST, failure=NO_RESPONSE, target_response=None, rules=RULES, settings=SETTINGS
     )
 
@@ -157,10 +161,10 @@ def test_response_is_marked_with_the_error_code() -> None:
 
 
 def test_rejection_carries_the_target_status() -> None:
-    response: TargetResponse = failed_request_answer(
+    response: Answer = failed_request_answer(
         request=TARGET_REQUEST,
         failure=REJECTION,
-        target_response=TargetResponse(status_code=201),
+        target_response=Answer(status_code=201),
         rules=RULES,
         settings=SETTINGS,
     )
@@ -207,7 +211,7 @@ def test_an_unexpected_error_returns_its_traceback() -> None:
 
 
 def test_rejected_password_is_left_out_of_the_answer() -> None:
-    response: TargetResponse = failed_request_answer(
+    response: Answer = failed_request_answer(
         request=TARGET_REQUEST,
         failure=password_rejection(),
         target_response=None,
@@ -219,11 +223,11 @@ def test_rejected_password_is_left_out_of_the_answer() -> None:
 
 
 def test_rejected_password_is_left_out_of_the_failure_record() -> None:
-    failure: RequestFailure = request_failure(
+    failure: FailureRecord = failure_record(
         request=TARGET_REQUEST,
         failure=password_rejection(),
         error_code="response_rejected",
-        target_response=TargetResponse(status_code=200, content=BDB_WITH_PASSWORD),
+        target_response=Answer(status_code=200, content=BDB_WITH_PASSWORD),
         redacted_fields=REDACT_ADMIN_PASSWORD,
     )
 
@@ -271,7 +275,7 @@ def test_rejected_password_is_left_out_of_the_failure_record() -> None:
         "unauthorized",
     ],
 )
-def test_every_own_answer_passes_the_firewall(answer: Callable[[], TargetResponse | Response]) -> None:
+def test_every_own_answer_passes_the_firewall(answer: Callable[[], Answer | Response]) -> None:
     assert FIREWALL.is_valid(instance=json.loads(s=content_of(answer=answer())))
 
 

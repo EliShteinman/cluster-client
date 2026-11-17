@@ -1,11 +1,13 @@
 from fastapi.security import HTTPBasic
 from starlette.requests import Request
 
+from app.access import login_challenge
 from app.config.failures import FailureCode
 from app.config.settings import Settings
+from app.failures.answers import failure_codes
 from app.logger.decorators import log_debug
 from app.models import FailureBody, TargetRequest
-from app.routes.read_request import own_headers
+from app.routes.read_request import header_of_field
 
 type OpenApiObject = dict[str, object]
 
@@ -17,13 +19,12 @@ class BasicAuthDocumentation(HTTPBasic):
 
 @log_debug
 def failure_responses(*, settings: Settings) -> dict[int | str, OpenApiObject]:
-    codes: list[FailureCode] = [code for _, code in settings.failures if isinstance(code, FailureCode)]
+    codes: list[FailureCode] = failure_codes(settings=settings.failures)
     statuses: list[int] = sorted({code.status_code for code in codes})
     return {
         status: documented_failure(
+            status=status,
             error_codes=[code.error_code for code in codes if code.status_code == status],
-            with_target_status=status == settings.failures.rejected.status_code,
-            with_challenge=status == settings.failures.unauthorized.status_code,
             settings=settings,
         )
         for status in statuses
@@ -31,25 +32,22 @@ def failure_responses(*, settings: Settings) -> dict[int | str, OpenApiObject]:
 
 
 @log_debug
-def documented_failure(
-    *, error_codes: list[str], with_target_status: bool, with_challenge: bool, settings: Settings
-) -> OpenApiObject:
+def documented_failure(*, status: int, error_codes: list[str], settings: Settings) -> OpenApiObject:
     headers: OpenApiObject = {
         settings.failures.error_header: {
             "description": "On every answer the cluster client writes itself; never on a target answer",
             "schema": {"type": "string", "enum": error_codes},
         }
     }
-    if with_target_status:
+    if status == settings.failures.rejected.status_code:
         headers[settings.failures.target_status_header] = {
             "description": f"The target's status, on {settings.failures.rejected.error_code} only",
             "schema": {"type": "integer"},
         }
-    if with_challenge:
-        challenge: str = f'{settings.access.scheme} realm="{settings.access.realm}"'
+    if status == settings.failures.unauthorized.status_code:
         headers[settings.access.challenge_header] = {
             "description": f"On {settings.failures.unauthorized.error_code}: the login the client asks for",
-            "schema": {"type": "string", "example": challenge},
+            "schema": {"type": "string", "example": login_challenge(settings=settings.access)},
         }
     return {"model": FailureBody, "description": ", ".join(error_codes), "headers": headers}
 
@@ -92,7 +90,7 @@ def target_request_headers(*, settings: Settings) -> list[OpenApiObject]:
             "required": TargetRequest.model_fields[field].is_required(),
             "schema": field_schemas[field],
         }
-        for field, header in own_headers(settings=settings.headers).items()
+        for field, header in header_of_field(settings=settings.headers).items()
     ]
 
 

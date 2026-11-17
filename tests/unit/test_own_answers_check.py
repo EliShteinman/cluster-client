@@ -5,7 +5,7 @@ from pydantic import JsonValue
 from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import NoEnvFileSettings, Settings
 from app.errors import SchemaLoadError
-from app.failures.fit_check import check_own_answers
+from app.failures.own_answers_check import check_own_answers
 from app.rules import ResponseRules
 from app.schema_limits import error_body_limits
 from tests.support.access import ACCESS

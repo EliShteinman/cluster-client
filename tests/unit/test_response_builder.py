@@ -7,7 +7,7 @@ from pydantic import JsonValue
 from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
 from app.field_paths import FieldPath
-from app.models import TargetResponse
+from app.models import Answer
 from app.response_builder import build_response
 from app.rules import ResponseRules
 from tests.support.rules import DRAFT_04, RULES, validator_of
@@ -37,16 +37,16 @@ def rules_ignoring(*, ignored_fields: tuple[FieldPath, ...]) -> ResponseRules:
     )
 
 
-def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> TargetResponse:
+def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> Answer:
     return build_response(
-        target_response=TargetResponse(status_code=200, headers={"x-answer": "1"}, content=content),
+        target_response=Answer(status_code=200, headers={"x-answer": "1"}, content=content),
         rules=rules_ignoring(ignored_fields=ignored_fields),
         settings=FailureSettings(),
     )
 
 
 def test_empty_body_is_returned_as_is() -> None:
-    empty: TargetResponse = TargetResponse(status_code=204)
+    empty: Answer = Answer(status_code=204)
 
     assert (
         build_response(
@@ -83,13 +83,13 @@ def test_schema_violation_is_rejected_with_the_failing_field() -> None:
 
 
 def test_ignored_field_no_longer_breaks_the_schema() -> None:
-    built: TargetResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
+    built: Answer = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
 
     assert json.loads(s=built.content) == {"uid": 1}
 
 
 def test_removing_a_field_keeps_status_and_headers() -> None:
-    built: TargetResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
+    built: Answer = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
 
     assert (built.status_code, built.headers) == (200, {"x-answer": "1"})
 
@@ -112,7 +112,7 @@ def test_body_too_deep_to_validate_is_rejected() -> None:
 
     with pytest.raises(ResponseRejectedError) as raised:
         build_response(
-            target_response=TargetResponse(status_code=200, content=BODY_TOO_DEEP_TO_VALIDATE),
+            target_response=Answer(status_code=200, content=BODY_TOO_DEEP_TO_VALIDATE),
             rules=rules,
             settings=FailureSettings(),
         )

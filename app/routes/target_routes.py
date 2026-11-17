@@ -7,7 +7,7 @@ from app.config.settings import Settings
 from app.errors import RequestFailedError
 from app.failures.answers import failed_request_answer
 from app.logger.decorators import log_debug, log_info
-from app.models import TargetRequest, TargetResponse
+from app.models import Answer, TargetRequest
 from app.response_builder import build_response
 from app.routes.read_request import read_body, read_target_request
 from app.routes.target_openapi import BasicAuthDocumentation, failure_responses, request_documentation
@@ -56,22 +56,18 @@ def target_endpoint(*, request: Request, body: Annotated[bytes, Depends(dependen
     target_request: TargetRequest = read_target_request(
         headers=dict(request.headers), body=body, settings=settings
     )
-    target_response: TargetResponse | None = None
+    target_response: Answer | None = None
     try:
         target_response = send_to_target(request=target_request, settings=settings.forwarding)
-        target_response = build_response(
+        answer: Answer = build_response(
             target_response=target_response, rules=rules, settings=settings.failures
         )
     except RequestFailedError as failure:
-        target_response = failed_request_answer(
+        answer = failed_request_answer(
             request=target_request,
             failure=failure,
             target_response=target_response,
             rules=rules,
             settings=settings,
         )
-    return Response(
-        content=target_response.content,
-        status_code=target_response.status_code,
-        headers=target_response.headers,
-    )
+    return Response(content=answer.content, status_code=answer.status_code, headers=answer.headers)

@@ -29,7 +29,7 @@ class TargetRequest(FrozenModel):
     body: bytes = Field(default=b"")
 
 
-class TargetResponse(FrozenModel):
+class Answer(FrozenModel):
     status_code: int
     headers: dict[str, str] = Field(default_factory=dict)
     content: bytes = Field(default=b"")
@@ -55,7 +55,7 @@ class FailureDetails(FrozenModel):
     reason: str
 
 
-class RequestFailure(FailureDetails):
+class FailureRecord(FailureDetails):
     method: str
     url: str
     target_status_code: int | None = None

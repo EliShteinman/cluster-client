@@ -15,7 +15,7 @@ async def read_body(*, request: Request) -> bytes:
 
 @log_debug
 def read_target_request(*, headers: dict[str, str], body: bytes, settings: Settings) -> TargetRequest:
-    header_of_field: dict[str, str] = own_headers(settings=settings.headers)
+    header_names: dict[str, str] = header_of_field(settings=settings.headers)
     prefix: str = settings.headers.target_prefix
     target_headers: dict[str, str] = {
         name.removeprefix(prefix): value for name, value in headers.items() if name.startswith(prefix)
@@ -23,7 +23,7 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
     try:
         request: TargetRequest = TargetRequest.model_validate(
             obj={
-                **{field: headers[name] for field, name in header_of_field.items() if name in headers},
+                **{field: headers[name] for field, name in header_names.items() if name in headers},
                 "headers": target_headers,
                 "body": body,
             }
@@ -32,7 +32,7 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
         raise HTTPException(
             status_code=settings.failures.invalid_request.status_code,
             detail=[
-                named_by_header(error=detail, header_of_field=header_of_field)
+                named_by_header(error=detail, header_of_field=header_names)
                 for detail in error.errors(include_url=False, include_input=False)
             ],
         ) from error
@@ -48,7 +48,7 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
 
 
 @log_debug
-def own_headers(*, settings: HeaderSettings) -> dict[str, str]:
+def header_of_field(*, settings: HeaderSettings) -> dict[str, str]:
     return {"method": settings.method, "url": settings.url}
 
 

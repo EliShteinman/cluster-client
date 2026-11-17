@@ -10,7 +10,7 @@ from pydantic import JsonValue
 
 from app.errors import ResponseRejectedError, SchemaLoadError
 from app.field_paths import FieldPath, remove_fields
-from app.json_file import read_json_file
+from app.json_reading import read_json_file
 from app.logger.decorators import log_debug, log_info
 
 

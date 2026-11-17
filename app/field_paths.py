@@ -1,15 +1,17 @@
 import re
 from pathlib import Path
 
-from pydantic import JsonValue
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from app.errors import FieldPathsLoadError
-from app.json_file import read_json_file
+from app.json_reading import read_json_file
 from app.logger.decorators import log_debug, log_info
 
 ROOT: str = "$"
 ALL_ITEMS: str = "[*]"
 SEGMENT_PATTERN: re.Pattern[str] = re.compile(pattern=r"\.([^.\[\]]+)|(\[\*\])")
+
+FIELD_PATH_LIST: TypeAdapter[list[str]] = TypeAdapter(type=list[str])
 
 type FieldPath = tuple[str, ...]
 
@@ -18,11 +20,10 @@ type FieldPath = tuple[str, ...]
 @log_debug
 def load_field_paths(*, path: Path) -> tuple[FieldPath, ...]:
     paths: JsonValue = read_json_file(path=path, error=FieldPathsLoadError)
-    fields: list[str] = (
-        [field for field in paths if isinstance(field, str)] if isinstance(paths, list) else []
-    )
-    if not isinstance(paths, list) or len(fields) != len(paths):
-        raise FieldPathsLoadError(path=path, reason="the file must be a JSON list of field paths")
+    try:
+        fields: list[str] = FIELD_PATH_LIST.validate_python(paths, strict=True)
+    except ValidationError:
+        raise FieldPathsLoadError(path=path, reason="the file must be a JSON list of field paths") from None
     field_paths: tuple[FieldPath, ...] = tuple(parse_field_path(field=field, path=path) for field in fields)
     if any(field_path[-1] == ALL_ITEMS for field_path in field_paths):
         raise FieldPathsLoadError(path=path, reason=f"a field path must name a field, not end in {ALL_ITEMS}")

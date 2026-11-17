@@ -1,8 +1,9 @@
 from pydantic import Field, SecretStr
 
 from app.config.base import BaseConfig
-from app.config.constants import BASIC_USERNAME_PATTERN
 from app.config.field_types import LowercaseHeaderName
+
+BASIC_USERNAME_PATTERN: str = r"^[^:]+$"
 
 
 class AccessSettings(BaseConfig):

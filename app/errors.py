@@ -52,11 +52,6 @@ class NoResponseError(TargetUnreachableError):
     pass
 
 
-class TotalTimeoutError(NoResponseError):
-    def __init__(self, *, url: str, seconds: float) -> None:
-        super().__init__(url=url, reason=f"no full answer within {seconds} seconds")
-
-
 class InvalidTargetRequestError(RequestFailedError):
     def __init__(self, *, url: str, reason: str) -> None:
         super().__init__(reason=f"cannot send to {url}: {reason}")

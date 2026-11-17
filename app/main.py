@@ -11,12 +11,12 @@ from starlette.exceptions import HTTPException
 from app.config.constants import DISTRIBUTION_NAME
 from app.config.settings import Settings
 from app.errors import AccessDeniedError
-from app.failures.fit_check import check_own_answers
-from app.failures.handlers import (
+from app.failures.exception_handlers import (
     access_denied_response,
     internal_error_response,
     refused_request_response,
 )
+from app.failures.own_answers_check import check_own_answers
 from app.logger.decorators import log_debug
 from app.logger.quiet import QuietPathsMiddleware
 from app.logger.setup import configure_logging, reset_logging

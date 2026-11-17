@@ -3,7 +3,7 @@ from pydantic import JsonValue
 
 from app.errors import SchemaLoadError
 from app.models import ErrorBodyLimits
-from app.schema_limits import error_body_limits
+from app.rules.schema_limits import error_body_limits
 from tests.support.rules import ERROR_BODY_PROPERTIES, SCHEMA_PATH, error_body_schema
 
 

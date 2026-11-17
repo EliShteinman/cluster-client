@@ -69,13 +69,32 @@ exhaustive = true
 layers = [
     "main | server",
     "routes",
-    "failures | response_builder | target_client | telemetry",
+    "failures | target | telemetry",
     "access | rules",
-    "schema | schema_limits",
-    "field_paths",
-    "models | json_reading",
+    "models",
     "logger",
     "errors | config",
+]
+
+[[tool.importlinter.contracts]]
+name = "rules layers"
+type = "layers"
+containers = ["app.rules"]
+exhaustive = true
+layers = [
+    "response_rules",
+    "schema | schema_limits",
+    "field_paths",
+    "json_reading",
+]
+
+[[tool.importlinter.contracts]]
+name = "target layers"
+type = "layers"
+containers = ["app.target"]
+exhaustive = true
+layers = [
+    "response_builder | client",
 ]
 
 [[tool.importlinter.contracts]]

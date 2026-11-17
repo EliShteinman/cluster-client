@@ -9,9 +9,9 @@ from jsonschema.validators import validator_for
 from pydantic import JsonValue
 
 from app.errors import ResponseRejectedError, SchemaLoadError
-from app.field_paths import FieldPath, remove_fields
-from app.json_reading import read_json_file
 from app.logger.decorators import log_debug, log_info
+from app.rules.field_paths import FieldPath, remove_fields
+from app.rules.json_reading import read_json_file
 
 
 @log_info(inputs=("path",))

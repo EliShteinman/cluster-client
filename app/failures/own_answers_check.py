@@ -9,8 +9,8 @@ from app.failures.answers import failure_codes
 from app.failures.body import failure_body
 from app.logger.decorators import log_debug, log_info
 from app.models import ErrorBodyLimits, FailureBody, FailureDetails
-from app.rules import ResponseRules
-from app.schema import first_violation
+from app.rules.response_rules import ResponseRules
+from app.rules.schema import first_violation
 
 
 @log_info()

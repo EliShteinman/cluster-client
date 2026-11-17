@@ -5,7 +5,7 @@ from jsonschema.validators import validator_for
 from pydantic import JsonValue
 
 from app.config.validation import ValidationSettings
-from app.rules import ResponseRules, load_rules
+from app.rules.response_rules import ResponseRules, load_rules
 
 FILES: Path = Path(__file__).parents[2] / "helm" / "files"
 SAMPLES: Path = Path(__file__).parent / "cluster_samples"

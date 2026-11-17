@@ -5,12 +5,12 @@ from pydantic import JsonValue
 from app.config.constants import TEXT_ENCODING
 from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
-from app.field_paths import ROOT, remove_fields
-from app.json_reading import read_json_body
 from app.logger.decorators import log_debug
 from app.models import Answer
-from app.rules import ResponseRules
-from app.schema import validate_body
+from app.rules.field_paths import ROOT, remove_fields
+from app.rules.json_reading import read_json_body
+from app.rules.response_rules import ResponseRules
+from app.rules.schema import validate_body
 
 
 @log_debug

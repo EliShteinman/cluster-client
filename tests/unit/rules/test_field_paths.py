@@ -6,7 +6,7 @@ import pytest
 from pydantic import JsonValue
 
 from app.errors import FieldPathsLoadError
-from app.field_paths import ALL_ITEMS, FieldPath, load_field_paths, remove_fields
+from app.rules.field_paths import ALL_ITEMS, FieldPath, load_field_paths, remove_fields
 
 DATABASES: list[JsonValue] = [
     {"uid": 1, "shards_placement": "dense", "endpoints": [{"internal_id": 5, "port": 12000}]},

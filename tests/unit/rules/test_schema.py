@@ -6,8 +6,8 @@ from jsonschema.protocols import Validator
 from pydantic import JsonValue
 
 from app.errors import ResponseRejectedError, SchemaLoadError
-from app.field_paths import FieldPath
-from app.schema import load_schema, validate_body
+from app.rules.field_paths import FieldPath
+from app.rules.schema import load_schema, validate_body
 from tests.support.rules import DRAFT_04, validator_of
 
 

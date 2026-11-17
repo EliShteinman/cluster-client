@@ -4,11 +4,11 @@ from jsonschema.protocols import Validator
 from pydantic import ConfigDict, JsonValue
 
 from app.config.validation import ValidationSettings
-from app.field_paths import FieldPath, load_field_paths
 from app.logger.decorators import log_debug
 from app.models import ErrorBodyLimits, FrozenModel
-from app.schema import load_schema
-from app.schema_limits import error_body_limits
+from app.rules.field_paths import FieldPath, load_field_paths
+from app.rules.schema import load_schema
+from app.rules.schema_limits import error_body_limits
 
 
 class ResponseRules(FrozenModel):

@@ -12,7 +12,7 @@ from app.errors import AccessDeniedError
 from app.failures.answers import logged_answer
 from app.logger.decorators import log_debug
 from app.models import Answer, FailureDetails
-from app.rules import ResponseRules
+from app.rules.response_rules import ResponseRules
 
 
 @log_debug

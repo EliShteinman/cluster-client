@@ -8,7 +8,6 @@ from app.errors import RequestFailedError
 from app.failures.answers import failed_request_answer
 from app.logger.decorators import log_debug, log_info
 from app.models import Answer, TargetRequest
-from app.response_builder import build_response
 from app.routes.read_request import read_body, read_target_request
 from app.routes.target_openapi import (
     BasicAuthDocumentation,
@@ -16,8 +15,9 @@ from app.routes.target_openapi import (
     request_documentation,
     trace_response_header,
 )
-from app.rules import ResponseRules
-from app.target_client import send_to_target
+from app.rules.response_rules import ResponseRules
+from app.target.client import send_to_target
+from app.target.response_builder import build_response
 
 
 @log_debug

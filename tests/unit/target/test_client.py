@@ -11,7 +11,7 @@ from app.errors import (
     RequestFailedError,
 )
 from app.models import Answer, TargetRequest
-from app.target_client import returned_headers, send_to_target
+from app.target.client import returned_headers, send_to_target
 from tests.support.fake_target_api import CONNECT_FAILURE, FakeTargetApi, SentRequest
 from tests.support.requests import TARGET_REQUEST, TARGET_URL
 

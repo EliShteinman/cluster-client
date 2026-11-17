@@ -4,8 +4,8 @@ from pathlib import Path
 from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from app.errors import FieldPathsLoadError
-from app.json_reading import read_json_file
 from app.logger.decorators import log_debug, log_info
+from app.rules.json_reading import read_json_file
 
 ROOT: str = "$"
 ALL_ITEMS: str = "[*]"

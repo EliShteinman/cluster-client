@@ -25,9 +25,9 @@ from app.failures.exception_handlers import (
     internal_error_response,
     refused_request_response,
 )
-from app.field_paths import FieldPath
 from app.models import Answer, FailureRecord
-from app.schema import validate_body
+from app.rules.field_paths import FieldPath
+from app.rules.schema import validate_body
 from tests.support.access import ACCESS
 from tests.support.requests import TARGET_REQUEST, TARGET_URL
 from tests.support.rules import DRAFT_04, RULES, validator_of

@@ -4,9 +4,9 @@ from pathlib import Path
 from pydantic import JsonValue
 
 from app.errors import SchemaLoadError
-from app.field_paths import ALL_ITEMS, FieldPath, parse_field_path
 from app.logger.decorators import log_debug, log_info
 from app.models import ErrorBodyLimits
+from app.rules.field_paths import ALL_ITEMS, FieldPath, parse_field_path
 
 LOCAL_REFERENCE_PREFIX: str = "#/"
 BRANCH_KEYWORDS: tuple[str, ...] = ("anyOf", "oneOf", "allOf")

@@ -22,7 +22,7 @@ from app.logger.quiet import QuietPathsMiddleware
 from app.logger.setup import configure_logging, reset_logging
 from app.routes.health_routes import health_router
 from app.routes.target_routes import build_target_router
-from app.rules import load_rules
+from app.rules.response_rules import load_rules
 from app.telemetry import build_tracer_provider, start_telemetry, stop_telemetry
 
 

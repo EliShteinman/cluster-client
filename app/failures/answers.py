@@ -8,11 +8,11 @@ from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import Settings
 from app.errors import ConnectionFailedError, InvalidTargetRequestError, NoResponseError, RequestFailedError
 from app.failures.body import failure_body
-from app.field_paths import FieldPath, remove_fields
-from app.json_reading import read_json_body
 from app.logger.decorators import log_debug
 from app.models import Answer, ErrorBodyLimits, FailureDetails, FailureRecord, TargetRequest
-from app.rules import ResponseRules
+from app.rules.field_paths import FieldPath, remove_fields
+from app.rules.json_reading import read_json_body
+from app.rules.response_rules import ResponseRules
 
 
 @log_debug

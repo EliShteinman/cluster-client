@@ -6,10 +6,10 @@ from pydantic import JsonValue
 
 from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
-from app.field_paths import FieldPath
 from app.models import Answer
-from app.response_builder import build_response
-from app.rules import ResponseRules
+from app.rules.field_paths import FieldPath
+from app.rules.response_rules import ResponseRules
+from app.target.response_builder import build_response
 from tests.support.rules import DRAFT_04, RULES, validator_of
 
 DATABASE_SCHEMA: dict[str, JsonValue] = {

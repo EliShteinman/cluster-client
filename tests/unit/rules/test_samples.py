@@ -5,7 +5,7 @@ import pytest
 
 from app.config.failures import FailureSettings
 from app.models import Answer
-from app.response_builder import build_response
+from app.target.response_builder import build_response
 from tests.support.rules import RULES, SAMPLES
 
 SAMPLE_FILES: list[Path] = sorted(SAMPLES.glob(pattern="*.json"))

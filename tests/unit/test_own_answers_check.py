@@ -9,20 +9,20 @@ from app.failures.fit_check import check_own_answers
 from app.rules import ResponseRules
 from app.schema_limits import error_body_limits
 from tests.support.access import ACCESS
-from tests.support.rules import DRAFT_04, RULES, validator_of
+from tests.support.rules import RULES, SCHEMA_PATH, error_body_schema, validator_of
 
 SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
 
 
-def rules_for(*, schema: dict[str, JsonValue]) -> ResponseRules:
-    validator: Validator = validator_of(schema={"$schema": DRAFT_04, **schema})
+def rules_for(*, changed: dict[str, JsonValue]) -> ResponseRules:
+    schema: dict[str, JsonValue] = error_body_schema(changed=changed)
+    validator: Validator = validator_of(schema=schema)
     return RULES.model_copy(
-        update={"schema_validator": validator, "error_limits": error_body_limits(schema=schema)}
+        update={
+            "schema_validator": validator,
+            "error_limits": error_body_limits(schema=schema, path=SCHEMA_PATH),
+        }
     )
-
-
-def strings_up_to(*, length: int) -> dict[str, JsonValue]:
-    return {"properties": {"reason": {"items": {"maxLength": length}}}}
 
 
 def test_the_firewall_schema_holds_every_own_answer() -> None:
@@ -30,17 +30,17 @@ def test_the_firewall_schema_holds_every_own_answer() -> None:
 
 
 @pytest.mark.parametrize(
-    "schema",
+    "changed",
     [
-        {"additionalProperties": False, "properties": {"error": {}, "rule": {}, "field": {}}},
-        strings_up_to(length=10),
-        {"properties": {"error": {"maxLength": 5}}},
-        {"properties": {"rule": {"maxLength": 5}}},
-        {"properties": {"field": {"maxLength": 2}}},
-        {"properties": {"reason": {"maxItems": 0}}},
+        {"reason": {"type": "string", "maxItems": 5, "items": {"maxLength": 60}}},
+        {"reason": {"maxItems": 5, "items": {"maxLength": 10}}},
+        {"error": {"maxLength": 5}},
+        {"rule": {"maxLength": 5}},
+        {"field": {"maxLength": 2}},
+        {"reason": {"maxItems": 0, "items": {"maxLength": 60}}},
     ],
     ids=[
-        "no reason allowed",
+        "reason not a list",
         "unsent message too long",
         "error too long",
         "rule too long",
@@ -48,9 +48,11 @@ def test_the_firewall_schema_holds_every_own_answer() -> None:
         "no parts",
     ],
 )
-def test_a_schema_that_cannot_hold_an_own_answer_stops_the_start(schema: dict[str, JsonValue]) -> None:
+def test_a_schema_that_cannot_hold_an_own_answer_stops_the_start(changed: dict[str, JsonValue]) -> None:
+    rules: ResponseRules = rules_for(changed=changed)
+
     with pytest.raises(SchemaLoadError):
-        check_own_answers(rules=rules_for(schema=schema), settings=SETTINGS)
+        check_own_answers(rules=rules, settings=SETTINGS)
 
 
 def test_a_configured_error_code_must_fit_the_schema() -> None:

@@ -73,6 +73,8 @@ def pick_inputs(*, arguments: dict[str, object], paths: tuple[str, ...]) -> dict
 
 
 def read_argument(*, arguments: dict[str, object], path: str) -> object:
+    argument_name: str
+    attribute_path: str
     argument_name, _, attribute_path = path.partition(PATH_SEPARATOR)
     return read_path(source=arguments[argument_name], path=attribute_path)
 

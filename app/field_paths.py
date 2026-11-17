@@ -23,7 +23,10 @@ def load_field_paths(*, path: Path) -> tuple[FieldPath, ...]:
     )
     if not isinstance(paths, list) or len(fields) != len(paths):
         raise FieldPathsLoadError(path=path, reason="the file must be a JSON list of field paths")
-    return tuple(parse_field_path(field=field, path=path) for field in fields)
+    field_paths: tuple[FieldPath, ...] = tuple(parse_field_path(field=field, path=path) for field in fields)
+    if any(field_path[-1] == ALL_ITEMS for field_path in field_paths):
+        raise FieldPathsLoadError(path=path, reason=f"a field path must name a field, not end in {ALL_ITEMS}")
+    return field_paths
 
 
 @log_debug
@@ -32,8 +35,8 @@ def parse_field_path(*, field: str, path: Path) -> FieldPath:
         raise FieldPathsLoadError(path=path, reason=f"{field} must start with {ROOT}")
     rest: str = field.removeprefix(ROOT)
     matches: list[re.Match[str]] = list(SEGMENT_PATTERN.finditer(string=rest))
-    if "".join(match.group(0) for match in matches) != rest or not matches or matches[-1].group(2):
-        raise FieldPathsLoadError(path=path, reason=f"{field} must name a field, like $.a[*].b")
+    if "".join(match.group(0) for match in matches) != rest or not matches:
+        raise FieldPathsLoadError(path=path, reason=f"{field} must be a field path, like $.a[*].b")
     return tuple(match.group(1) or ALL_ITEMS for match in matches)
 
 
@@ -47,14 +50,15 @@ def remove_fields(*, body: JsonValue, field_paths: tuple[FieldPath, ...]) -> Jso
 
 @log_debug
 def without_field(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
-    head, *rest = field_path
+    head: str = field_path[0]
+    rest: FieldPath = field_path[1:]
     if head == ALL_ITEMS:
-        return without_field_in_items(node=node, field_path=tuple(rest))
+        return without_field_in_items(node=node, field_path=rest)
     if not isinstance(node, dict) or head not in node:
         return node
     if not rest:
         return {key: value for key, value in node.items() if key != head}
-    child: JsonValue = without_field(node=node[head], field_path=tuple(rest))
+    child: JsonValue = without_field(node=node[head], field_path=rest)
     return node if child is node[head] else {**node, head: child}
 
 

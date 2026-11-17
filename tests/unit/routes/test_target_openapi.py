@@ -1,3 +1,5 @@
+from typing import cast
+
 from app.config.settings import NoEnvFileSettings, Settings
 from app.routes.target_openapi import documented_target_headers, failure_responses, target_request_headers
 from tests.support.access import ACCESS
@@ -21,3 +23,10 @@ def test_documented_target_headers_carry_the_prefix() -> None:
         "x-target-authorization",
         "x-target-content-type",
     ]
+
+
+def test_the_login_challenge_is_documented_on_unauthorized() -> None:
+    unauthorized: dict[str, object] = failure_responses(settings=SETTINGS)[401]
+    headers: dict[str, object] = cast(typ=dict[str, object], val=unauthorized["headers"])
+
+    assert "www-authenticate" in headers

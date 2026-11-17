@@ -1,46 +1,51 @@
 import re
+from pathlib import Path
 
 from pydantic import JsonValue
 
+from app.errors import SchemaLoadError
+from app.field_paths import ALL_ITEMS, FieldPath, parse_field_path
 from app.logger.decorators import log_debug, log_info
 from app.models import ErrorBodyLimits
 
-ITEMS: None = None
 LOCAL_REFERENCE_PREFIX: str = "#/"
 BRANCH_KEYWORDS: tuple[str, ...] = ("anyOf", "oneOf", "allOf")
 
 type SchemaNode = dict[str, JsonValue]
-type SchemaStep = str | None
 
 
 @log_info(outputs=("part_length", "max_parts", "field_length"))
 @log_debug
-def error_body_limits(*, schema: JsonValue) -> ErrorBodyLimits:
-    if not isinstance(schema, dict):
+def error_body_limits(*, schema: SchemaNode, path: Path) -> ErrorBodyLimits:
+    try:
         return ErrorBodyLimits(
-            error_length=None, rule_length=None, field_length=None, part_length=None, max_parts=None
+            error_length=smallest_limit(schema=schema, field="$.error", keyword="maxLength", path=path),
+            rule_length=smallest_limit(schema=schema, field="$.rule", keyword="maxLength", path=path),
+            field_length=smallest_limit(schema=schema, field="$.field", keyword="maxLength", path=path),
+            part_length=smallest_limit(schema=schema, field="$.reason[*]", keyword="maxLength", path=path),
+            max_parts=smallest_limit(schema=schema, field="$.reason", keyword="maxItems", path=path),
         )
-    return ErrorBodyLimits(
-        error_length=smallest_limit(schema=schema, path=("error",), keyword="maxLength"),
-        rule_length=smallest_limit(schema=schema, path=("rule",), keyword="maxLength"),
-        field_length=smallest_limit(schema=schema, path=("field",), keyword="maxLength"),
-        part_length=smallest_limit(schema=schema, path=("reason", ITEMS), keyword="maxLength"),
-        max_parts=smallest_limit(schema=schema, path=("reason",), keyword="maxItems"),
-    )
+    except RecursionError as error:
+        raise SchemaLoadError(path=path, reason="the schema refers to itself") from error
 
 
 @log_debug
-def smallest_limit(*, schema: SchemaNode, path: tuple[SchemaStep, ...], keyword: str) -> int | None:
+def smallest_limit(*, schema: SchemaNode, field: str, keyword: str, path: Path) -> int:
+    field_path: FieldPath = parse_field_path(field=field, path=path)
     limits: list[int] = [
-        limit for node in nodes_at(schema=schema, path=path) if isinstance(limit := node.get(keyword), int)
+        limit
+        for node in nodes_at(schema=schema, field_path=field_path)
+        if isinstance(limit := node.get(keyword), int)
     ]
-    return min(limits, default=None)
+    if not limits:
+        raise SchemaLoadError(path=path, reason=f"no {keyword} for {field}, the error body needs one")
+    return min(limits)
 
 
 @log_debug
-def nodes_at(*, schema: SchemaNode, path: tuple[SchemaStep, ...]) -> list[SchemaNode]:
+def nodes_at(*, schema: SchemaNode, field_path: FieldPath) -> list[SchemaNode]:
     nodes: list[SchemaNode] = expanded(schema=schema, node=schema)
-    for step in path:
+    for step in field_path:
         nodes = [
             found
             for node in nodes
@@ -73,15 +78,16 @@ def referenced(*, schema: SchemaNode, reference: str) -> SchemaNode:
 
 
 @log_debug
-def children(*, node: SchemaNode, step: SchemaStep) -> list[SchemaNode]:
-    if step is None:
+def children(*, node: SchemaNode, step: str) -> list[SchemaNode]:
+    if step == ALL_ITEMS:
         return item_schemas(node=node)
     return property_schemas(node=node, name=step)
 
 
 @log_debug
 def property_schemas(*, node: SchemaNode, name: str) -> list[SchemaNode]:
-    named: JsonValue = schema_of(value=node.get("properties"), key=name)
+    properties: JsonValue = node.get("properties")
+    named: JsonValue = properties.get(name) if isinstance(properties, dict) else None
     patterns: JsonValue = node.get("patternProperties")
     pattern_schemas: dict[str, JsonValue] = patterns if isinstance(patterns, dict) else {}
     matching: list[SchemaNode] = [
@@ -105,11 +111,6 @@ def item_schemas(*, node: SchemaNode) -> list[SchemaNode]:
         *schema_list(value=node.get("prefixItems")),
         *([additional] if isinstance(additional, dict) else []),
     ]
-
-
-@log_debug
-def schema_of(*, value: JsonValue, key: str) -> JsonValue:
-    return value.get(key) if isinstance(value, dict) else None
 
 
 @log_debug

@@ -16,7 +16,10 @@ async def read_body(*, request: Request) -> bytes:
 @log_debug
 def read_target_request(*, headers: dict[str, str], body: bytes, settings: Settings) -> TargetRequest:
     header_of_field: dict[str, str] = own_headers(settings=settings.headers)
-    target_headers: dict[str, str] = headers_for_target(headers=headers, settings=settings.headers)
+    prefix: str = settings.headers.target_prefix
+    target_headers: dict[str, str] = {
+        name.removeprefix(prefix): value for name, value in headers.items() if name.startswith(prefix)
+    }
     try:
         request: TargetRequest = TargetRequest.model_validate(
             obj={
@@ -33,7 +36,9 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
                 for detail in error.errors(include_url=False, include_input=False)
             ],
         ) from error
-    refused: list[str] = refused_headers(target_headers=target_headers, settings=settings.headers)
+    refused: list[str] = sorted(
+        prefix + name for name in target_headers if name in settings.headers.refused_target_headers
+    )
     if refused:
         raise HTTPException(
             status_code=settings.failures.invalid_request.status_code,
@@ -45,22 +50,6 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
 @log_debug
 def own_headers(*, settings: HeaderSettings) -> dict[str, str]:
     return {"method": settings.method, "url": settings.url}
-
-
-@log_debug
-def headers_for_target(*, headers: dict[str, str], settings: HeaderSettings) -> dict[str, str]:
-    return {
-        name.removeprefix(settings.target_prefix): value
-        for name, value in headers.items()
-        if name.startswith(settings.target_prefix)
-    }
-
-
-@log_debug
-def refused_headers(*, target_headers: dict[str, str], settings: HeaderSettings) -> list[str]:
-    return sorted(
-        settings.target_prefix + name for name in target_headers if name in settings.refused_target_headers
-    )
 
 
 @log_debug

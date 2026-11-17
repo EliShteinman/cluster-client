@@ -23,6 +23,7 @@ def failure_responses(*, settings: Settings) -> dict[int | str, OpenApiObject]:
         status: documented_failure(
             error_codes=[code.error_code for code in codes if code.status_code == status],
             with_target_status=status == settings.failures.rejected.status_code,
+            with_challenge=status == settings.failures.unauthorized.status_code,
             settings=settings,
         )
         for status in statuses
@@ -31,7 +32,7 @@ def failure_responses(*, settings: Settings) -> dict[int | str, OpenApiObject]:
 
 @log_debug
 def documented_failure(
-    *, error_codes: list[str], with_target_status: bool, settings: Settings
+    *, error_codes: list[str], with_target_status: bool, with_challenge: bool, settings: Settings
 ) -> OpenApiObject:
     headers: OpenApiObject = {
         settings.failures.error_header: {
@@ -43,6 +44,12 @@ def documented_failure(
         headers[settings.failures.target_status_header] = {
             "description": f"The target's status, on {settings.failures.rejected.error_code} only",
             "schema": {"type": "integer"},
+        }
+    if with_challenge:
+        challenge: str = f'{settings.access.scheme} realm="{settings.access.realm}"'
+        headers[settings.access.challenge_header] = {
+            "description": f"On {settings.failures.unauthorized.error_code}: the login the client asks for",
+            "schema": {"type": "string", "example": challenge},
         }
     return {"model": FailureBody, "description": ", ".join(error_codes), "headers": headers}
 

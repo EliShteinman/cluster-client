@@ -24,8 +24,8 @@ def check_own_answers(*, rules: ResponseRules, settings: Settings) -> None:
 @log_debug
 def fit_problems(*, rules: ResponseRules, settings: Settings) -> list[str]:
     limits: ErrorBodyLimits = rules.error_limits
-    if limits.max_parts is not None and limits.max_parts < 1:
-        return ["the reason of an error body must hold at least one part"]
+    if limits.max_parts < 1 or limits.part_length < 1:
+        return ["the reason of an error body must hold at least one part of at least one character"]
     error_codes: list[str] = [
         code.error_code for _, code in settings.failures if isinstance(code, FailureCode)
     ]
@@ -55,23 +55,19 @@ def fit_problems(*, rules: ResponseRules, settings: Settings) -> list[str]:
 
 
 @log_debug
-def too_long(*, values: list[str], limit: int | None, name: str) -> list[str]:
-    return [
-        f"{name} {value!r} is longer than {limit}"
-        for value in values
-        if limit is not None and len(value) > limit
-    ]
+def too_long(*, values: list[str], limit: int, name: str) -> list[str]:
+    return [f"{name} {value!r} is longer than {limit}" for value in values if len(value) > limit]
 
 
 @log_debug
 def sample_details(
     *, error_codes: list[str], rule_names: list[str], limits: ErrorBodyLimits
 ) -> FailureDetails:
-    parts: int = (limits.part_length or 1) * (limits.max_parts or 1)
+    parts: int = limits.part_length * limits.max_parts
     return FailureDetails(
         error=max(error_codes, key=len),
         rule=max(rule_names, key=len),
-        field="$." + "a" * (limits.field_length or 1),
+        field="$." + "a" * limits.field_length,
         reason="x" * (parts + 1),
     )
 

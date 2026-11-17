@@ -27,5 +27,7 @@ def load_rules(*, settings: ValidationSettings) -> ResponseRules:
         schema_validator=schema_validator,
         ignored_fields=load_field_paths(path=settings.ignored_fields_path),
         redacted_fields=load_field_paths(path=settings.redacted_fields_path),
-        error_limits=error_body_limits(schema=cast(typ=JsonValue, val=schema_validator.schema)),
+        error_limits=error_body_limits(
+            schema=cast(typ=dict[str, JsonValue], val=schema_validator.schema), path=settings.schema_path
+        ),
     )

@@ -22,7 +22,11 @@ def build_target_router(*, settings: Settings) -> APIRouter:
         path="/",
         endpoint=target_endpoint,
         methods=["POST"],
-        response_description="The target's own answer: its status, headers and body, unchanged",
+        response_description=(
+            "The target's own answer: its status, headers and body. The ignored fields are removed from "
+            "the body (then re-encoded); the headers the server recomputes and any "
+            f"{settings.forwarding.edge_header_prefix}* header of the target are not returned"
+        ),
         responses=failure_responses(settings=settings),
         openapi_extra=request_documentation(settings=settings),
         dependencies=[
@@ -41,7 +45,7 @@ def build_target_router(*, settings: Settings) -> APIRouter:
 @log_debug
 def require_access(*, request: Request) -> None:
     settings: Settings = request.app.state.settings
-    check_access(headers=dict(request.headers), settings=settings.access)
+    check_access(header_value=request.headers.get(settings.access.header, ""), settings=settings.access)
 
 
 @log_info(outputs=("status_code",))

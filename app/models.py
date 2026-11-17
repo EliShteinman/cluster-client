@@ -1,11 +1,11 @@
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter
+from pydantic import AfterValidator, AnyHttpUrl, BaseModel, ConfigDict, Field, TypeAdapter
 
 from app.config.constants import HTTP_TCHAR_PATTERN
 from app.logger.decorators import log_debug
 
-HTTP_URL: TypeAdapter[HttpUrl] = TypeAdapter(type=HttpUrl)
+HTTP_URL: TypeAdapter[AnyHttpUrl] = TypeAdapter(type=AnyHttpUrl)
 
 
 class FrozenModel(BaseModel):
@@ -20,12 +20,12 @@ def checked_http_url(url: str) -> str:
 
 class TargetRequest(FrozenModel):
     method: str = Field(
-        pattern=HTTP_TCHAR_PATTERN, description="Any HTTP method; sent to the target as received"
+        pattern=HTTP_TCHAR_PATTERN, description="Any HTTP method; sent as requests sends it, in upper case"
     )
     url: Annotated[str, AfterValidator(func=checked_http_url)] = Field(
-        description="An http or https URL; sent to the target exactly as received, query string included"
+        description="An http or https URL of any length; sent as requests sends it, query included"
     )
-    headers: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict, repr=False)
     body: bytes = Field(default=b"")
 
 
@@ -63,11 +63,11 @@ class RequestFailure(FailureDetails):
 
 
 class ErrorBodyLimits(FrozenModel):
-    error_length: int | None
-    rule_length: int | None
-    field_length: int | None
-    part_length: int | None
-    max_parts: int | None
+    error_length: int
+    rule_length: int
+    field_length: int
+    part_length: int
+    max_parts: int
 
 
 class HealthStatus(FrozenModel):

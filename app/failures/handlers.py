@@ -66,4 +66,5 @@ def own_failure_answer(*, request: Request, code: FailureCode, reason: str, leve
         level=level,
         limits=rules.error_limits,
         settings=settings,
+        extra_headers={},
     )

@@ -21,6 +21,10 @@ DATABASE_SCHEMA: dict[str, JsonValue] = {
 }
 SCHEMA: Validator = validator_of(schema=DATABASE_SCHEMA)
 DEEP_BODY: bytes = b"[" * 100_000 + b"]" * 100_000
+NESTED_LISTS_SCHEMA: Validator = validator_of(
+    schema={"$schema": DRAFT_04, "type": "array", "items": {"$ref": "#"}}
+)
+BODY_TOO_DEEP_TO_VALIDATE: bytes = b"[" * 400 + b"]" * 400
 IGNORE_INTERNAL: tuple[FieldPath, ...] = (("internal",),)
 
 
@@ -101,3 +105,16 @@ def test_non_standard_number_is_rejected_as_not_json(content: bytes) -> None:
 def test_deeply_nested_body_is_rejected() -> None:
     with pytest.raises(ResponseRejectedError):
         build(content=DEEP_BODY, ignored_fields=IGNORE_INTERNAL)
+
+
+def test_body_too_deep_to_validate_is_rejected() -> None:
+    rules: ResponseRules = RULES.model_copy(update={"schema_validator": NESTED_LISTS_SCHEMA})
+
+    with pytest.raises(ResponseRejectedError) as raised:
+        build_response(
+            target_response=TargetResponse(status_code=200, content=BODY_TOO_DEEP_TO_VALIDATE),
+            rules=rules,
+            settings=FailureSettings(),
+        )
+
+    assert raised.value.rule == "too_deep"

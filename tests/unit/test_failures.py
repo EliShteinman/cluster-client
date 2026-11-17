@@ -45,7 +45,7 @@ REQUEST: Request = Request(
 
 
 LONG_TEXT: str = "too long " * 400
-HUGE_TEXT: str = "x" * ((RULES.error_limits.part_length or 0) * 500 + 10)
+HUGE_TEXT: str = "x" * (RULES.error_limits.part_length * 500 + 10)
 HUGE_REJECTION: ResponseRejectedError = ResponseRejectedError(
     rule="anyOf", field="$" + ".a" * 300, reason=HUGE_TEXT
 )

@@ -17,9 +17,9 @@ def failure_body(
 
 @log_debug
 def reason_parts(*, text: str, limits: ErrorBodyLimits, settings: FailureSettings) -> list[str]:
-    length: int = limits.part_length or len(text) or 1
+    length: int = limits.part_length
     parts: list[str] = [text[start : start + length] for start in range(0, len(text), length)]
-    if limits.max_parts is None or len(parts) <= limits.max_parts:
+    if len(parts) <= limits.max_parts:
         return parts
     kept: list[str] = parts[: limits.max_parts - 1]
     unsent: int = len(text) - length * len(kept)
@@ -28,7 +28,7 @@ def reason_parts(*, text: str, limits: ErrorBodyLimits, settings: FailureSetting
 
 @log_debug
 def shortened_field(*, field: str | None, limits: ErrorBodyLimits, settings: FailureSettings) -> str | None:
-    if field is None or limits.field_length is None or len(field) <= limits.field_length:
+    if field is None or len(field) <= limits.field_length:
         return field
     prefix: str = settings.shortened_field_prefix
     return prefix + field[len(field) - limits.field_length + len(prefix) :]

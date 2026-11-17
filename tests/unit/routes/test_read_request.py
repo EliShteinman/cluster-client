@@ -88,6 +88,12 @@ def test_the_url_is_kept_as_received() -> None:
     assert read(headers={**TARGET_HEADERS, "x-edge-url": UNNORMALIZED_URL}).url == UNNORMALIZED_URL
 
 
+def test_a_long_url_is_accepted() -> None:
+    long_url: str = TARGET_URL + "?fields=" + "a" * 5000
+
+    assert read(headers={**TARGET_HEADERS, "x-edge-url": long_url}).url == long_url
+
+
 def test_a_url_that_is_not_http_is_refused() -> None:
     assert refusal(headers={**TARGET_HEADERS, "x-edge-url": "ftp://cluster/file"}).status_code == 422
 

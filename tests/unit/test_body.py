@@ -5,7 +5,7 @@ from tests.support.rules import RULES
 
 SETTINGS: FailureSettings = FailureSettings()
 LIMITS: ErrorBodyLimits = RULES.error_limits
-PART_LENGTH: int = LIMITS.part_length or 0
+PART_LENGTH: int = LIMITS.part_length
 LONG_REASON: str = "".join(str(number % 10) for number in range(1300))
 TOO_LONG_REASON: str = "x" * (PART_LENGTH * 500 + 10)
 LONG_FIELD: str = "$" + ".level" * 100 + ".authentication_admin_pass"

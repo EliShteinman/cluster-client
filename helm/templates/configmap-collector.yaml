@@ -17,7 +17,7 @@ data:
             endpoint: 127.0.0.1:4318
       file_log:
         include:
-          - {{ .Values.mounts.logs }}/app.log
+          - {{ .Values.logs.directory }}/{{ .Values.logs.app }}
         start_at: beginning
         storage: file_storage
         operators:

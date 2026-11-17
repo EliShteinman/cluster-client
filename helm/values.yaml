@@ -20,9 +20,15 @@ route:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
 
-mounts:
-  files: /etc/cluster-client
-  logs: /app/logs
+files:
+  schema: /etc/cluster-client/response-schema.json
+  ignoredFields: /etc/cluster-client/ignored-fields.json
+  redactedFields: /etc/cluster-client/redacted-fields.json
+
+logs:
+  directory: /app/logs
+  app: app.log
+  failures: failures.log
 
 logsSizeLimit: 512Mi
 

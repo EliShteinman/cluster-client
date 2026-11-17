@@ -10,7 +10,8 @@
     "containerPort",
     "service",
     "route",
-    "mounts",
+    "files",
+    "logs",
     "logsSizeLimit",
     "config",
     "secret",
@@ -114,19 +115,45 @@
         }
       }
     },
-    "mounts": {
+    "files": {
+      "description": "Where each runtime file is mounted, one path per file",
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "files",
-        "logs"
+        "schema",
+        "ignoredFields",
+        "redactedFields"
       ],
       "properties": {
-        "files": {
+        "schema": {
           "$ref": "#/$defs/absolutePath"
         },
-        "logs": {
+        "ignoredFields": {
           "$ref": "#/$defs/absolutePath"
+        },
+        "redactedFields": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "logs": {
+      "description": "The log folder shared with the collector, and each log file's name in it",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "directory",
+        "app",
+        "failures"
+      ],
+      "properties": {
+        "directory": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "app": {
+          "$ref": "#/$defs/fileName"
+        },
+        "failures": {
+          "$ref": "#/$defs/fileName"
         }
       }
     },
@@ -266,6 +293,10 @@
       "type": "string",
       "pattern": "^/[^\\s]*$"
     },
+    "fileName": {
+      "type": "string",
+      "pattern": "^[^/\\s]+$"
+    },
     "quantity": {
       "type": "string",
       "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|Ki|Mi|Gi)?$"
@@ -276,14 +307,19 @@
       "maximum": 65535
     },
     "environment": {
-      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value, and every field name inside a section, when it starts (README, Configuration). The image sets the host and port.",
+      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value, and every field name inside a section, when it starts (README, Configuration). The image sets the host; the chart sets the port and the file paths from containerPort, files and logs.",
       "type": "object",
       "propertyNames": {
         "pattern": "^CLUSTER_CLIENT_[A-Z0-9_]+$",
         "not": {
           "enum": [
             "CLUSTER_CLIENT_SERVER__HOST",
-            "CLUSTER_CLIENT_SERVER__PORT"
+            "CLUSTER_CLIENT_SERVER__PORT",
+            "CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH",
+            "CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH",
+            "CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH",
+            "CLUSTER_CLIENT_LOG__FILE__PATH",
+            "CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH"
           ]
         }
       },

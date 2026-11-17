@@ -44,16 +44,26 @@ spec:
             - secretRef:
                 name: {{ include "cluster-client.fullname" . }}
             {{- end }}
-          {{- if .Values.collector.enabled }}
           env:
+            - name: CLUSTER_CLIENT_SERVER__PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH
+              value: {{ .Values.files.schema | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH
+              value: {{ .Values.files.ignoredFields | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH
+              value: {{ .Values.files.redactedFields | quote }}
+            - name: CLUSTER_CLIENT_LOG__FILE__PATH
+              value: {{ printf "%s/%s" .Values.logs.directory .Values.logs.app | quote }}
+            - name: CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH
+              value: {{ printf "%s/%s" .Values.logs.directory .Values.logs.failures | quote }}
+          {{- if .Values.collector.enabled }}
             - name: CLUSTER_CLIENT_LOG__LEVEL
               value: {{ .Values.collector.logLevel | quote }}
             - name: CLUSTER_CLIENT_LOG__FILE__ENABLED
               value: "true"
             - name: CLUSTER_CLIENT_LOG__FILE__FORMAT
               value: json
-            - name: CLUSTER_CLIENT_LOG__FILE__PATH
-              value: {{ printf "%s/app.log" .Values.mounts.logs | quote }}
             - name: CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED
               value: "true"
             - name: CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT
@@ -71,10 +81,19 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: files
-              mountPath: {{ .Values.mounts.files }}
+              mountPath: {{ .Values.files.schema }}
+              subPath: response-schema.json
+              readOnly: true
+            - name: files
+              mountPath: {{ .Values.files.ignoredFields }}
+              subPath: ignored-fields.json
+              readOnly: true
+            - name: files
+              mountPath: {{ .Values.files.redactedFields }}
+              subPath: redacted-fields.json
               readOnly: true
             - name: logs
-              mountPath: {{ .Values.mounts.logs }}
+              mountPath: {{ .Values.logs.directory }}
         {{- if .Values.collector.enabled }}
         - name: collector
           image: {{ include "cluster-client.collectorImage" . | quote }}
@@ -107,7 +126,7 @@ spec:
             - name: collector-state
               mountPath: /var/lib/otelcol/file_storage
             - name: logs
-              mountPath: {{ .Values.mounts.logs }}
+              mountPath: {{ .Values.logs.directory }}
               readOnly: true
         {{- end }}
       volumes:

@@ -54,22 +54,38 @@ def log_info[**P, R](
             picked_outputs: dict[str, object] = {
                 path: read_path(source=result, path=path) for path in outputs
             }
-            summary: str = f"{joined(values=picked_inputs)} -> {joined(values=picked_outputs)}"
             logger.info(
-                msg=f"{name} {summary} in {duration_ms} ms",
+                msg=line_of(
+                    name=name,
+                    inputs=picked_inputs,
+                    outcome=joined(values=picked_outputs),
+                    duration_ms=duration_ms,
+                ),
                 extra={"inputs": picked_inputs, "outputs": picked_outputs, "duration_ms": duration_ms},
             )
 
         def on_error(*, arguments: dict[str, object], error: Exception, duration_ms: float) -> None:
             picked_inputs: dict[str, object] = pick_inputs(arguments=arguments, paths=inputs)
             logger.info(
-                msg=f"{name} {joined(values=picked_inputs)} -> {type(error).__name__} in {duration_ms} ms",
+                msg=line_of(
+                    name=name, inputs=picked_inputs, outcome=type(error).__name__, duration_ms=duration_ms
+                ),
                 extra={"inputs": picked_inputs, "error": type(error).__name__, "duration_ms": duration_ms},
             )
 
         return wrap_call(function=function, on_call=None, on_return=on_return, on_error=on_error)
 
     return decorate
+
+
+def line_of(*, name: str, inputs: dict[str, object], outcome: str, duration_ms: float) -> str:
+    parts: list[str] = [
+        name,
+        joined(values=inputs),
+        f"-> {outcome}" if outcome else "",
+        f"in {duration_ms} ms",
+    ]
+    return " ".join(part for part in parts if part)
 
 
 def pick_inputs(*, arguments: dict[str, object], paths: tuple[str, ...]) -> dict[str, object]:

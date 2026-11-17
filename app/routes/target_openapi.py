@@ -63,7 +63,11 @@ def trace_response_header(*, settings: TelemetrySettings) -> OpenApiObject:
         settings.trace_response_header: {
             "description": "The trace of this call (the manager's, if sent); its log lines carry its id",
             "schema": {"type": "string"},
-        }
+        },
+        settings.exposed_headers_header: {
+            "description": f"Always {settings.trace_response_header}, set by OpenTelemetry with it",
+            "schema": {"type": "string"},
+        },
     }
 
 

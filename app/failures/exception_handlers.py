@@ -1,3 +1,4 @@
+import json
 import logging
 import traceback
 
@@ -15,12 +16,17 @@ from app.rules import ResponseRules
 
 
 @log_debug
+def reason_text(*, detail: object) -> str:
+    return detail if isinstance(detail, str) else json.dumps(obj=detail, ensure_ascii=False, default=str)
+
+
+@log_debug
 def refused_request_response(request: Request, error: HTTPException) -> Response:
     settings: Settings = request.app.state.settings
     answer: Answer = own_failure_answer(
         request=request,
         code=settings.failures.invalid_request,
-        reason=str(object=error.detail),
+        reason=reason_text(detail=error.detail),
         level=logging.WARNING,
     )
     return Response(

@@ -46,3 +46,10 @@ def test_every_documented_failure_carries_the_trace_response_header() -> None:
         "traceresponse" in cast(typ=dict[str, object], val=failure["headers"])
         for failure in failure_responses(settings=SETTINGS).values()
     )
+
+
+def test_every_documented_failure_carries_the_exposed_headers_header() -> None:
+    assert all(
+        "access-control-expose-headers" in cast(typ=dict[str, object], val=failure["headers"])
+        for failure in failure_responses(settings=SETTINGS).values()
+    )

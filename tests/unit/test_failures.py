@@ -192,6 +192,14 @@ def test_a_refused_request_keeps_its_headers() -> None:
     assert refused_request_response(REQUEST, error).headers["allow"] == "POST"
 
 
+def test_a_refused_header_reason_is_json() -> None:
+    response: Response = refused_request_response(
+        REQUEST, HTTPException(status_code=400, detail=[{"type": "missing", "loc": ("x-edge-url",)}])
+    )
+
+    assert json.loads(s=reason_of(response=response)) == [{"type": "missing", "loc": ["x-edge-url"]}]
+
+
 def test_denied_access_gets_the_configured_status() -> None:
     assert access_denied_response(REQUEST, AccessDeniedError(header="authorization")).status_code == 401
 

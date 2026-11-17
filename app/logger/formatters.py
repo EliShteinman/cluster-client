@@ -53,11 +53,20 @@ def extra_fields_of(*, record: logging.LogRecord) -> dict[str, JsonValue]:
     return {name: value for name, value in vars(record).items() if name not in STANDARD_RECORD_FIELDS}
 
 
+class LineFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return super().format(record=with_trace_placeholders(record=record))
+
+
+def with_trace_placeholders(*, record: logging.LogRecord) -> logging.LogRecord:
+    shown: logging.LogRecord = logging.makeLogRecord(dict=vars(record))
+    for source in TRACE_FIELDS.values():
+        if getattr(shown, source, NO_TRACE) == NO_TRACE:
+            setattr(shown, source, MISSING_TRACE_PLACEHOLDER)
+    return shown
+
+
 def build_formatter(*, log_format: LogFormat, settings: FormattingSettings) -> logging.Formatter:
     if log_format is LogFormat.JSON:
         return JsonFormatter()
-    return logging.Formatter(
-        fmt=settings.line_pattern,
-        datefmt=settings.date_format,
-        defaults=dict.fromkeys(TRACE_FIELDS.values(), MISSING_TRACE_PLACEHOLDER),
-    )
+    return LineFormatter(fmt=settings.line_pattern, datefmt=settings.date_format)

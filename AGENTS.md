@@ -25,8 +25,8 @@ one visible call:
    is sent to the target.
 3. `read_target_request` (`app/routes/read_request.py`) turns the incoming headers + body into a `TargetRequest`:
    `x-edge-method` and `x-edge-url` (the tool's own headers: read, never sent), and every header that starts with
-   `x-target-`, without the prefix. Missing/invalid own header, or an `x-target-` header in
-   `headers.refused_target_headers` (hop-by-hop and framing: `host`, `content-length`, …) → HTTP 400 with
+   `x-target-`, without the prefix. Missing/invalid own header, a header that is exactly `x-target-` (no name), or an
+   `x-target-` header in `headers.refused_target_headers` (hop-by-hop and framing: `host`, `content-length`, …) → HTTP 400 with
    `x-edge-error: invalid_request`. Nothing is sent to the target.
 4. `send_to_target` (`app/target_client.py`) calls the target with `requests` in a worker thread and waits at most
    `forwarding.timeout_seconds` for the whole call; `RequestsInstrumentor` adds `traceparent`. A `requests` error
@@ -66,7 +66,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/models.py` | `FrozenModel` (base of the data models), `TargetRequest` (method: any HTTP token; url: checked as an http(s) URL, kept as received; headers; body), `Answer` (status, headers, content: the target's answer or one the service writes itself), `FailureBody`, `FailureDetails`, `FailureRecord`, `ErrorBodyLimits`, `HealthStatus` |
 | `app/errors.py` | `ClusterClientError` → `AccessDeniedError`, `NonStandardJsonError`, `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `TargetUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `InvalidTargetRequestError`, `ResponseRejectedError` |
 | `app/routes/target_routes.py` | `build_target_router(settings)`, `require_access` (dependency of `POST /`) and the `POST /` orchestrator `target_endpoint` |
-| `app/routes/target_openapi.py` | the OpenAPI of `POST /` from the settings: the forwarding rule, the own headers, the documented `x-target-*` headers, every failure status with `FailureBody` and its headers |
+| `app/routes/target_openapi.py` | the OpenAPI of `POST /` from the settings: the forwarding rule, the own headers, the documented `x-target-*` headers, `traceparent` (optional), every failure status with `FailureBody` and its headers, `traceresponse` on every documented answer (names in `settings.telemetry`) |
 | `app/routes/read_request.py` | `read_body` (async, see below), `read_target_request` (own headers, `x-target-*` without the prefix, refused headers), `header_of_field`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
 | `app/access.py` | `check_access` (gets only the access header value) and `expected_credentials`, both not decorated: they hold the password; `login_challenge` (the `www-authenticate` value, sent on 401 and shown in `/docs`) |
@@ -85,7 +85,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/logger/quiet.py` | `QuietPathsMiddleware` (marks a request to `log.quiet_paths` in the `quiet_request` context variable), `QuietRequestFilter` (on every handler: drops its records below `log.quiet_kept_level`, uvicorn's access line included; failures stay) |
 | `run_local.py` / `docker/entrypoint.py` | local run with settings in code / container run with settings from env |
 | `helm/files/response-schema.json`, `helm/files/ignored-fields.json`, `helm/files/redacted-fields.json` | the three runtime files, one copy only: the local default path, the tests, and the Helm files ConfigMap (never baked into the image) |
-| `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap (every `helm/files/*.json`, as is), optional collector sidecar (`collector.*`). One values file per network in `helm/networks/` (`domain`, optional `image.tag` / `route.host`); `_helpers.tpl` builds the image and route host from `domain`. `values.schema.json` restricts every chart value; `config`/`secret` keys must be `CLUSTER_CLIENT_*` strings, minus those the image owns (host, port); the service checks their values, and every field name inside a section, when it starts |
+| `helm/` | OpenShift chart: Deployment, Service, Route, ConfigMap and Secret (keys only from `config` / `secret` in values), files ConfigMap (every `helm/files/*.json`, as is), optional collector sidecar (`collector.*`). One values file per network in `helm/networks/` (`domain`, optional `image.tag` / `route.host`); `_helpers.tpl` builds the image and route host from `domain`. `values.schema.json` restricts every chart value; `config`/`secret` keys must be `CLUSTER_CLIENT_*` strings, minus the host (set by the image) and those the chart sets from `containerPort`, `files` (one path per runtime file, mounted with `subPath`) and `logs` (the folder shared with the collector, and each log file name) (port, `VALIDATION__*_PATH`, `LOG__FILE__PATH`, `LOG__FAILURE_FILE__PATH`); the service checks their values, and every field name inside a section, when it starts |
 | `tests/support/cluster_samples/` | real Redis Enterprise answers, passwords replaced; every one must pass the real `helm/files` (`tests/unit/test_samples.py`) |
 
 ## Mandatory coding rules (the owner enforces these strictly)
@@ -103,7 +103,12 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
    `call_target`, and `send_to_target`, which keeps its `@log_info` of method, URL and status);
    `TargetRequest.headers` is left out of its repr (`repr=False`), so a `TargetRequest` passed to another function
    never logs them; `read_target_request` stays decorated on purpose: its arguments are the one DEBUG line with
-   the target's `authorization` and the manager's access header (see below). Also not decorated: `lifespan` (logging
+   the target's `authorization` and the manager's access header (see below). **Helpers that run inside a recursion
+   or a loop** get no `@log_debug` when their one caller already logs the whole input and output once: the body walk
+   of `remove_fields` (`without_field`, `without_field_in_items`), `every_error` under `violation_at`, the schema walk
+   of `nodes_at` (`with_alternatives`, `referenced`, `children`, `property_schemas`, `item_schemas`, `schema_list`)
+   and `parse_field_path` under `load_field_paths`. Logging them repeated the same body at every level (about 55
+   times its size per request). Also not decorated: `lifespan` (logging
    does not exist yet when it starts, so its lines are lost), `app/logger/`, `app/config/` (the logger imports it),
    exception constructors, and tests.
 5. **Config is the single source** of every name the code expects (header names, status codes, error codes, paths,
@@ -141,8 +146,13 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   `authorization`, `x-target-cluster-state-id` → `cluster-state-id`); no other incoming header reaches the target.
   The tool's own headers have their own prefix (`x-edge-method`, `x-edge-url`, like `x-edge-error`): read,
   never sent. `authorization` to the target is optional (a metrics call may have none). An `x-target-` header
-  naming a hop-by-hop or framing header (`headers.refused_target_headers`) is refused as `invalid_request`.
+  naming a hop-by-hop or framing header (`headers.refused_target_headers`), or naming nothing (exactly `x-target-`),
+  is refused as `invalid_request`.
   The access header (`settings.access.header`) is never forwarded. OpenTelemetry sets `traceparent`.
+  `Settings.own_headers_keep_their_prefixes` stops the start when one of the tool's own request headers
+  (`headers.method`, `headers.url`, `access.header`) starts with `headers.target_prefix`, or when
+  `failures.error_header` / `failures.target_status_header` does not start with `forwarding.edge_header_prefix`
+  (otherwise a target could fake it).
 - **The method and the URL go as `requests` sends them** (contract C1; owner's decision 2026-11-17: the manager
   also uses `requests`, so its behaviour is the standard): the method is any HTTP token and the URL any http(s)
   URL (`AnyHttpUrl` checks it, no length limit); `TargetRequest` keeps both as received, never pydantic's
@@ -198,7 +208,8 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
   header, the manager's access header included); `check_access` gets only the access header and is not decorated,
   and `TargetRequest.headers` has `repr=False`. The owner chose this;
   do not "fix" it. The owner must always have one place with the full error and the whole call: the DEBUG file log
-  (`CLUSTER_CLIENT_LOG__FILE__ENABLED=true`, off by default). Never clean a secret without keeping it there.
+  (`CLUSTER_CLIENT_LOG__FILE__ENABLED=true` with `CLUSTER_CLIENT_LOG__LEVEL=DEBUG`; off by default, the root
+  level is INFO so no DEBUG line is built when no handler writes it). Never clean a secret without keeping it there.
 - **The firewall schema is checked by the draft it declares** (`validator_for`): draft-04 today, the firewall's
   draft, on purpose. Tests use the same real files in `helm/files/` (no copy).
 - **Firewall faithfulness**: the firewall accepts only standard JSON, so `NaN`/`Infinity` in a target body are
@@ -257,5 +268,7 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 
 - `/health/ready` should check something real.
 - A header sent twice (two `x-target-*` with the same name) reaches the target with its first value only
-  (`dict(request.headers)`). To check (owner, 2026-11-17): how complicated it is to replace `dict[str, str]` with a
-  type that keeps every value.
+  (`dict(request.headers)`). The same holds for the answer: `returned_headers` builds a `dict[str, str]`, so a
+  header the target sends several times (e.g. `Set-Cookie`) reaches the manager as one comma-joined value. To check
+  (owner, 2026-11-17): how complicated it is to replace `dict[str, str]` with a type that keeps every value, in both
+  directions.

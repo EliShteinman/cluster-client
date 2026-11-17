@@ -55,7 +55,8 @@ curl -X POST http://127.0.0.1:8000/ \
   `x-target-authorization` → `authorization`, `x-target-content-type` → `content-type`,
   `x-target-cluster-state-id` → `cluster-state-id`. No other header reaches the target, so a target without
   credentials simply gets no `authorization`. An `x-target-` header that names a hop-by-hop or framing header
-  (`host`, `content-length`, `transfer-encoding`, `connection`, …) is refused with `invalid_request`.
+  (`host`, `content-length`, `transfer-encoding`, `connection`, …), or no header at all (exactly `x-target-`), is
+  refused with `invalid_request`.
 - The request body, if any, is sent to the target as is. An incoming `traceparent` is continued to the target, and
   the response carries `traceresponse`.
 
@@ -236,15 +237,16 @@ helm upgrade --install cluster-client helm -f helm/networks/<network>.yaml \
 
 `helm/values.yaml` holds what every network shares. `helm/networks/<network>.yaml` holds only what differs in
 one network: `domain` (required), and if needed `image.tag` or `route.host`. `helm/values.schema.json` rejects
-any unknown key or invalid chart value; `config`/`secret` keys must be `CLUSTER_CLIENT_*` names, except the host and
-port the image sets.
+any unknown key or invalid chart value; `config`/`secret` keys must be `CLUSTER_CLIENT_*` names, except the host the image sets and
+the port, file paths and log paths the chart sets from `containerPort`, `files` and `logs`.
 
 - image: `<image.registry>.<domain>/<image.repository>:<image.tag>` (empty tag: the chart's `appVersion`)
 - route host: `route.host` if set, else `<route.name>.<domain>`
 
 The three runtime files are read from `helm/files/` (`response-schema.json`, `ignored-fields.json`,
-`redacted-fields.json`) and mounted at `mounts.files`. To change one, replace the file there and run
-`helm upgrade` again; the pods restart with it.
+`redacted-fields.json`) and each is mounted at its own path: `files.schema`, `files.ignoredFields`,
+`files.redactedFields`. The logs go to `logs.directory` (shared with the collector), as `logs.app` and
+`logs.failures`. To change a file, replace it there and run `helm upgrade` again; the pods restart with it.
 
 | Key | Content |
 |---|---|

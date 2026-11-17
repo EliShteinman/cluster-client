@@ -1,7 +1,12 @@
 from typing import cast
 
 from app.config.settings import NoEnvFileSettings, Settings
-from app.routes.target_openapi import documented_target_headers, failure_responses, target_request_headers
+from app.routes.target_openapi import (
+    documented_target_headers,
+    failure_responses,
+    target_request_headers,
+    trace_request_header,
+)
 from tests.support.access import ACCESS
 
 SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
@@ -30,3 +35,14 @@ def test_the_login_challenge_is_documented_on_unauthorized() -> None:
     headers: dict[str, object] = cast(typ=dict[str, object], val=unauthorized["headers"])
 
     assert "www-authenticate" in headers
+
+
+def test_the_trace_header_is_documented_as_optional() -> None:
+    assert trace_request_header(settings=SETTINGS.telemetry)["required"] is False
+
+
+def test_every_documented_failure_carries_the_trace_response_header() -> None:
+    assert all(
+        "traceresponse" in cast(typ=dict[str, object], val=failure["headers"])
+        for failure in failure_responses(settings=SETTINGS).values()
+    )

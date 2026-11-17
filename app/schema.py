@@ -57,7 +57,6 @@ def violation_at(*, body: JsonValue, schema: Validator, json_path: str) -> Valid
     return max(at_path, key=relevance, default=None)
 
 
-@log_debug
 def every_error(*, errors: Iterable[ValidationError]) -> list[ValidationError]:
     return [found for error in errors for found in (error, *every_error(errors=error.context or ()))]
 

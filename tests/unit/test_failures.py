@@ -49,7 +49,7 @@ REQUEST: Request = Request(
 
 
 LONG_TEXT: str = "too long " * 400
-HUGE_TEXT: str = "x" * (RULES.error_limits.part_length * 500 + 10)
+HUGE_TEXT: str = "x" * (RULES.error_limits.part_length * RULES.error_limits.max_parts + 10)
 HUGE_REJECTION: ResponseRejectedError = ResponseRejectedError(
     rule="anyOf", field="$" + ".a" * 300, reason=HUGE_TEXT
 )
@@ -172,6 +172,14 @@ def test_rejection_carries_the_target_status() -> None:
     assert response.headers["x-edge-target-status"] == "201"
 
 
+def test_a_failure_without_a_target_answer_carries_no_target_status() -> None:
+    response: Answer = failed_request_answer(
+        request=TARGET_REQUEST, failure=NO_RESPONSE, target_response=None, rules=RULES, settings=SETTINGS
+    )
+
+    assert "x-edge-target-status" not in response.headers
+
+
 def test_a_refused_request_is_marked_as_our_own_answer() -> None:
     response: Response = refused_request_response(REQUEST, HTTPException(status_code=404))
 
@@ -184,10 +192,14 @@ def test_a_refused_request_keeps_its_headers() -> None:
     assert refused_request_response(REQUEST, error).headers["allow"] == "POST"
 
 
+def test_denied_access_gets_the_configured_status() -> None:
+    assert access_denied_response(REQUEST, AccessDeniedError(header="authorization")).status_code == 401
+
+
 def test_denied_access_is_marked_as_our_own_answer() -> None:
     response: Response = access_denied_response(REQUEST, AccessDeniedError(header="authorization"))
 
-    assert (response.status_code, response.headers["x-edge-error"]) == (401, "unauthorized")
+    assert response.headers["x-edge-error"] == "unauthorized"
 
 
 def test_denied_access_asks_for_basic_credentials() -> None:
@@ -196,10 +208,14 @@ def test_denied_access_asks_for_basic_credentials() -> None:
     assert response.headers["www-authenticate"] == 'Basic realm="cluster-client"'
 
 
+def test_an_unexpected_error_gets_the_configured_status() -> None:
+    assert internal_error_response(REQUEST, RecursionError("too deep")).status_code == 500
+
+
 def test_an_unexpected_error_is_marked_as_our_own_answer() -> None:
     response: Response = internal_error_response(REQUEST, RecursionError("too deep"))
 
-    assert (response.status_code, response.headers["x-edge-error"]) == (500, "internal_error")
+    assert response.headers["x-edge-error"] == "internal_error"
 
 
 def test_an_unexpected_error_returns_its_message() -> None:

@@ -7,7 +7,9 @@ SETTINGS: FailureSettings = FailureSettings()
 LIMITS: ErrorBodyLimits = RULES.error_limits
 PART_LENGTH: int = LIMITS.part_length
 LONG_REASON: str = "".join(str(number % 10) for number in range(1300))
-TOO_LONG_REASON: str = "x" * (PART_LENGTH * 500 + 10)
+TOO_LONG_REASON: str = "x" * (PART_LENGTH * LIMITS.max_parts + 10)
+FULL_REASON: str = "x" * (PART_LENGTH * LIMITS.max_parts)
+FIELD_AT_THE_LIMIT: str = "$." + "a" * (LIMITS.field_length - 2)
 LONG_FIELD: str = "$" + ".level" * 100 + ".authentication_admin_pass"
 
 
@@ -23,7 +25,7 @@ def test_reason_parts_join_back_to_the_whole_reason() -> None:
 
 
 def test_too_long_reason_is_cut_to_the_firewall_item_count() -> None:
-    assert len(reason_parts(text=TOO_LONG_REASON, limits=LIMITS, settings=SETTINGS)) == 500
+    assert len(reason_parts(text=TOO_LONG_REASON, limits=LIMITS, settings=SETTINGS)) == LIMITS.max_parts
 
 
 def test_last_part_of_a_cut_reason_counts_the_unsent_characters() -> None:
@@ -34,7 +36,9 @@ def test_last_part_of_a_cut_reason_counts_the_unsent_characters() -> None:
 
 
 def test_long_field_is_shortened_to_the_firewall_length() -> None:
-    assert len(shortened_field(field=LONG_FIELD, limits=LIMITS, settings=SETTINGS) or "") == PART_LENGTH
+    assert (
+        len(shortened_field(field=LONG_FIELD, limits=LIMITS, settings=SETTINGS) or "") == LIMITS.field_length
+    )
 
 
 def test_shortened_field_keeps_the_end_of_the_path() -> None:
@@ -45,3 +49,11 @@ def test_shortened_field_keeps_the_end_of_the_path() -> None:
 
 def test_shortened_field_starts_with_the_configured_prefix() -> None:
     assert (shortened_field(field=LONG_FIELD, limits=LIMITS, settings=SETTINGS) or "").startswith("...")
+
+
+def test_a_reason_that_fills_every_part_is_not_cut() -> None:
+    assert "".join(reason_parts(text=FULL_REASON, limits=LIMITS, settings=SETTINGS)) == FULL_REASON
+
+
+def test_a_field_at_the_limit_is_kept() -> None:
+    assert shortened_field(field=FIELD_AT_THE_LIMIT, limits=LIMITS, settings=SETTINGS) == FIELD_AT_THE_LIMIT

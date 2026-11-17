@@ -33,10 +33,16 @@ def without(*, name: str) -> dict[str, str]:
     return {header: value for header, value in TARGET_HEADERS.items() if header != name}
 
 
-def test_own_headers_become_the_target_request() -> None:
-    request: TargetRequest = read_target_request(headers=TARGET_HEADERS, body=b"{}", settings=SETTINGS)
+def test_the_method_header_becomes_the_method() -> None:
+    assert read(headers=TARGET_HEADERS).method == "GET"
 
-    assert (request.method, request.url, request.body) == ("GET", TARGET_URL, b"{}")
+
+def test_the_url_header_becomes_the_url() -> None:
+    assert read(headers=TARGET_HEADERS).url == TARGET_URL
+
+
+def test_the_body_is_kept() -> None:
+    assert read_target_request(headers=TARGET_HEADERS, body=b"{}", settings=SETTINGS).body == b"{}"
 
 
 @pytest.mark.parametrize("missing", ["x-edge-method", "x-edge-url"])
@@ -82,6 +88,14 @@ def test_a_request_without_target_authorization_is_accepted() -> None:
 @pytest.mark.parametrize("header", ["x-target-host", "x-target-content-length", "x-target-transfer-encoding"])
 def test_a_hop_by_hop_target_header_is_refused(header: str) -> None:
     assert refusal(headers={**TARGET_HEADERS, header: "x"}).status_code == 422
+
+
+def test_the_refusal_names_the_refused_header() -> None:
+    assert "x-target-host" in str(refusal(headers={**TARGET_HEADERS, "x-target-host": "x"}).detail)
+
+
+def test_a_target_header_without_a_name_is_refused() -> None:
+    assert refusal(headers={**TARGET_HEADERS, "x-target-": "x"}).status_code == 422
 
 
 def test_the_url_is_kept_as_received() -> None:

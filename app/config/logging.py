@@ -36,7 +36,7 @@ class FormattingSettings(BaseConfig):
 
 
 class LoggingSettings(BaseConfig):
-    level: LogLevel = Field(default="DEBUG")
+    level: LogLevel = Field(default="INFO")
     quiet_paths: frozenset[str] = Field(default=frozenset({"/health/live", "/health/ready"}))
     quiet_kept_level: LogLevel = Field(default="WARNING")
     console: HandlerSettings = Field(

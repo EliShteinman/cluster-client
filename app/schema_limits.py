@@ -14,7 +14,7 @@ BRANCH_KEYWORDS: tuple[str, ...] = ("anyOf", "oneOf", "allOf")
 type SchemaNode = dict[str, JsonValue]
 
 
-@log_info(outputs=("part_length", "max_parts", "field_length"))
+@log_info(outputs=("error_length", "rule_length", "field_length", "part_length", "max_parts"))
 @log_debug
 def error_body_limits(*, schema: SchemaNode, path: Path) -> ErrorBodyLimits:
     try:
@@ -55,7 +55,6 @@ def nodes_at(*, schema: SchemaNode, field_path: FieldPath) -> list[SchemaNode]:
     return nodes
 
 
-@log_debug
 def with_alternatives(*, schema: SchemaNode, node: SchemaNode) -> list[SchemaNode]:
     found: list[SchemaNode] = [node]
     reference: JsonValue = node.get("$ref")
@@ -67,7 +66,6 @@ def with_alternatives(*, schema: SchemaNode, node: SchemaNode) -> list[SchemaNod
     return found
 
 
-@log_debug
 def referenced(*, schema: SchemaNode, reference: str) -> SchemaNode:
     if not reference.startswith(LOCAL_REFERENCE_PREFIX):
         return {}
@@ -77,14 +75,12 @@ def referenced(*, schema: SchemaNode, reference: str) -> SchemaNode:
     return node if isinstance(node, dict) else {}
 
 
-@log_debug
 def children(*, node: SchemaNode, step: str) -> list[SchemaNode]:
     if step == ALL_ITEMS:
         return item_schemas(node=node)
     return property_schemas(node=node, name=step)
 
 
-@log_debug
 def property_schemas(*, node: SchemaNode, name: str) -> list[SchemaNode]:
     properties: JsonValue = node.get("properties")
     named: JsonValue = properties.get(name) if isinstance(properties, dict) else None
@@ -100,7 +96,6 @@ def property_schemas(*, node: SchemaNode, name: str) -> list[SchemaNode]:
     return found or ([additional] if isinstance(additional, dict) else [])
 
 
-@log_debug
 def item_schemas(*, node: SchemaNode) -> list[SchemaNode]:
     items: JsonValue = node.get("items")
     if isinstance(items, dict):
@@ -112,6 +107,5 @@ def item_schemas(*, node: SchemaNode) -> list[SchemaNode]:
     ]
 
 
-@log_debug
 def schema_list(*, value: JsonValue) -> list[SchemaNode]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []

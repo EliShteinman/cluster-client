@@ -30,7 +30,6 @@ def load_field_paths(*, path: Path) -> tuple[FieldPath, ...]:
     return field_paths
 
 
-@log_debug
 def parse_field_path(*, field: str, path: Path) -> FieldPath:
     if not field.startswith(ROOT):
         raise FieldPathsLoadError(path=path, reason=f"{field} must start with {ROOT}")
@@ -49,7 +48,6 @@ def remove_fields(*, body: JsonValue, field_paths: tuple[FieldPath, ...]) -> Jso
     return cleaned
 
 
-@log_debug
 def without_field(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
     head: str = field_path[0]
     rest: FieldPath = field_path[1:]
@@ -63,7 +61,6 @@ def without_field(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
     return node if child is node[head] else {**node, head: child}
 
 
-@log_debug
 def without_field_in_items(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
     if not isinstance(node, list):
         return node

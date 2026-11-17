@@ -1,3 +1,4 @@
+import copy
 import json
 from pathlib import Path
 
@@ -61,6 +62,8 @@ def test_only_the_named_field_is_removed(field_path: FieldPath, expected: list[J
 
 
 def test_the_original_body_is_left_untouched() -> None:
+    original: list[JsonValue] = copy.deepcopy(x=DATABASES)
+
     remove_fields(body=DATABASES, field_paths=((ALL_ITEMS, "shards_placement"),))
 
-    assert "shards_placement" in str(DATABASES)
+    assert original == DATABASES

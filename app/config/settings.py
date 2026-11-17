@@ -1,6 +1,6 @@
-from typing import ClassVar
+from typing import ClassVar, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.config.access import AccessSettings
@@ -37,6 +37,22 @@ class Settings(BaseSettings):
     failures: FailureSettings = Field(default=FailureSettings())
     log: LoggingSettings = Field(default=LoggingSettings())
     telemetry: TelemetrySettings = Field(default=TelemetrySettings())
+
+    @model_validator(mode="after")
+    def own_headers_keep_their_prefixes(self) -> Self:
+        target_prefix: str = self.headers.target_prefix
+        edge_prefix: str = self.forwarding.edge_header_prefix
+        read_headers: list[str] = [self.headers.method, self.headers.url, self.access.header]
+        written_headers: list[str] = [self.failures.error_header, self.failures.target_status_header]
+        forwarded: list[str] = [name for name in read_headers if name.startswith(target_prefix)]
+        fakeable: list[str] = [name for name in written_headers if not name.lower().startswith(edge_prefix)]
+        problems: list[str] = [
+            *(f"{name} must not start with {target_prefix}" for name in forwarded),
+            *(f"{name} must start with {edge_prefix}" for name in fakeable),
+        ]
+        if problems:
+            raise ValueError("; ".join(problems))
+        return self
 
 
 class NoEnvFileSettings(Settings):

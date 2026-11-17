@@ -28,7 +28,7 @@ class HeaderSettings(BaseConfig):
         )
     )
     refused_reason: str = Field(
-        default="{headers}: hop-by-hop and framing headers are never sent to the target"
+        default="{headers}: nameless, hop-by-hop and framing headers are never sent to the target"
     )
     documented_target_headers: tuple[LowercaseHeaderName, ...] = Field(
         default=("authorization", "content-type")

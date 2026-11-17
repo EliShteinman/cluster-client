@@ -10,7 +10,12 @@ from app.logger.decorators import log_debug, log_info
 from app.models import Answer, TargetRequest
 from app.response_builder import build_response
 from app.routes.read_request import read_body, read_target_request
-from app.routes.target_openapi import BasicAuthDocumentation, failure_responses, request_documentation
+from app.routes.target_openapi import (
+    BasicAuthDocumentation,
+    failure_responses,
+    request_documentation,
+    trace_response_header,
+)
 from app.rules import ResponseRules
 from app.target_client import send_to_target
 
@@ -27,7 +32,10 @@ def build_target_router(*, settings: Settings) -> APIRouter:
             "the body (then re-encoded); the headers the server recomputes and any "
             f"{settings.forwarding.edge_header_prefix}* header of the target are not returned"
         ),
-        responses=failure_responses(settings=settings),
+        responses={
+            200: {"headers": trace_response_header(settings=settings.telemetry)},
+            **failure_responses(settings=settings),
+        },
         openapi_extra=request_documentation(settings=settings),
         dependencies=[
             Depends(dependency=require_access),

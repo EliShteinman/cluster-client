@@ -32,12 +32,14 @@ def read_target_request(*, headers: dict[str, str], body: bytes, settings: Setti
         raise HTTPException(
             status_code=settings.failures.invalid_request.status_code,
             detail=[
-                named_by_header(error=detail, header_of_field=header_names)
+                named_by_header(error=detail, headers_by_field=header_names)
                 for detail in error.errors(include_url=False, include_input=False)
             ],
         ) from error
     refused: list[str] = sorted(
-        prefix + name for name in target_headers if name in settings.headers.refused_target_headers
+        prefix + name
+        for name in target_headers
+        if not name or name in settings.headers.refused_target_headers
     )
     if refused:
         raise HTTPException(
@@ -53,5 +55,5 @@ def header_of_field(*, settings: HeaderSettings) -> dict[str, str]:
 
 
 @log_debug
-def named_by_header(*, error: ErrorDetails, header_of_field: dict[str, str]) -> ErrorDetails:
-    return {**error, "loc": tuple(header_of_field.get(str(part), part) for part in error["loc"])}
+def named_by_header(*, error: ErrorDetails, headers_by_field: dict[str, str]) -> ErrorDetails:
+    return {**error, "loc": tuple(headers_by_field.get(str(part), part) for part in error["loc"])}

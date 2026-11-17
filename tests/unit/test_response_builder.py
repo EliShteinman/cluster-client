@@ -88,10 +88,14 @@ def test_ignored_field_no_longer_breaks_the_schema() -> None:
     assert json.loads(s=built.content) == {"uid": 1}
 
 
-def test_removing_a_field_keeps_status_and_headers() -> None:
+def test_removing_a_field_keeps_the_status() -> None:
+    assert build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL).status_code == 200
+
+
+def test_removing_a_field_keeps_the_headers() -> None:
     built: Answer = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
 
-    assert (built.status_code, built.headers) == (200, {"x-answer": "1"})
+    assert built.headers == {"x-answer": "1"}
 
 
 @pytest.mark.parametrize("content", [b'{"uid": NaN}', b'{"uid": Infinity}', b'{"uid": -Infinity}'])

@@ -4,7 +4,7 @@ from pydantic import JsonValue
 from app.errors import SchemaLoadError
 from app.models import ErrorBodyLimits
 from app.schema_limits import error_body_limits
-from tests.support.rules import SCHEMA_PATH, error_body_schema
+from tests.support.rules import ERROR_BODY_PROPERTIES, SCHEMA_PATH, error_body_schema
 
 
 def limits_of(*, schema: dict[str, JsonValue]) -> ErrorBodyLimits:
@@ -67,3 +67,40 @@ def test_a_schema_that_refers_to_itself_stops_the_start() -> None:
 
     with pytest.raises(SchemaLoadError, match="refers to itself"):
         limits_of(schema=schema)
+
+
+def test_a_limit_is_found_through_additional_properties() -> None:
+    schema: dict[str, JsonValue] = {
+        **error_body_schema(changed={}),
+        "properties": {name: value for name, value in ERROR_BODY_PROPERTIES.items() if name != "field"},
+        "additionalProperties": {"maxLength": 33},
+    }
+
+    assert limits_of(schema=schema).field_length == 33
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    [([{"maxLength": 40}], 40), ([{"maxLength": 70}], 50)],
+    ids=["item list", "additional items"],
+)
+def test_a_part_limit_is_found_through_item_lists(items: list[JsonValue], expected: int) -> None:
+    reason: dict[str, JsonValue] = {"maxItems": 5, "items": items, "additionalItems": {"maxLength": 50}}
+
+    assert limits_of(schema=error_body_schema(changed={"reason": reason})).part_length == expected
+
+
+@pytest.mark.parametrize("keyword", ["allOf", "oneOf"])
+def test_the_smallest_limit_of_every_branch_keyword_is_taken(keyword: str) -> None:
+    field: dict[str, JsonValue] = {keyword: [{"maxLength": 30}, {"maxLength": 20}]}
+
+    assert limits_of(schema=error_body_schema(changed={"field": field})).field_length == 20
+
+
+def test_a_reference_with_escaped_characters_is_followed() -> None:
+    schema: dict[str, JsonValue] = {
+        **error_body_schema(changed={"field": {"$ref": "#/definitions/a~1b~0c"}}),
+        "definitions": {"a/b~c": {"maxLength": 27}},
+    }
+
+    assert limits_of(schema=schema).field_length == 27

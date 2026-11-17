@@ -4,6 +4,7 @@ from starlette.requests import Request
 from app.access import login_challenge
 from app.config.failures import FailureCode
 from app.config.settings import Settings
+from app.config.telemetry import TelemetrySettings
 from app.failures.answers import failure_codes
 from app.logger.decorators import log_debug
 from app.models import FailureBody, TargetRequest
@@ -49,7 +50,21 @@ def documented_failure(*, status: int, error_codes: list[str], settings: Setting
             "description": f"On {settings.failures.unauthorized.error_code}: the login the client asks for",
             "schema": {"type": "string", "example": login_challenge(settings=settings.access)},
         }
-    return {"model": FailureBody, "description": ", ".join(error_codes), "headers": headers}
+    return {
+        "model": FailureBody,
+        "description": ", ".join(error_codes),
+        "headers": {**headers, **trace_response_header(settings=settings.telemetry)},
+    }
+
+
+@log_debug
+def trace_response_header(*, settings: TelemetrySettings) -> OpenApiObject:
+    return {
+        settings.trace_response_header: {
+            "description": "The trace of this call (the manager's, if sent); its log lines carry its id",
+            "schema": {"type": "string"},
+        }
+    }
 
 
 @log_debug
@@ -59,12 +74,24 @@ def request_documentation(*, settings: Settings) -> OpenApiObject:
         "parameters": [
             *target_request_headers(settings=settings),
             *documented_target_headers(settings=settings),
+            trace_request_header(settings=settings.telemetry),
         ],
         "requestBody": {
             "required": False,
             "description": "Sent to the target as is",
             "content": {"*/*": {"schema": {}}},
         },
+    }
+
+
+@log_debug
+def trace_request_header(*, settings: TelemetrySettings) -> OpenApiObject:
+    return {
+        "name": settings.trace_header,
+        "in": "header",
+        "required": False,
+        "description": "The manager's trace; the call to the target and every log line continue it",
+        "schema": {"type": "string"},
     }
 
 
@@ -76,7 +103,7 @@ def forwarding_rule(*, settings: Settings) -> str:
         f"Every header that starts with {prefix} is sent to the target without the prefix "
         f"({prefix}authorization becomes authorization); no other header reaches the target. "
         f"{settings.headers.method} and {settings.headers.url} are read, never sent. "
-        f"Refused with {settings.failures.invalid_request.error_code}: {refused}."
+        f"Refused with {settings.failures.invalid_request.error_code}: {prefix} alone (no name), {refused}."
     )
 
 

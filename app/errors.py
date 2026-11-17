@@ -21,6 +21,11 @@ class FieldPathsLoadError(ConfigFileLoadError):
     content: ClassVar[str] = "the field paths"
 
 
+class NonStandardJsonError(ClusterClientError, ValueError):
+    def __init__(self, *, constant: str) -> None:
+        super().__init__(f"{constant} is not a JSON value")
+
+
 class AccessDeniedError(ClusterClientError):
     def __init__(self, *, header: str) -> None:
         super().__init__(f"the {header} header is missing or does not hold the expected credentials")
@@ -34,17 +39,27 @@ class RequestFailedError(ClusterClientError):
         self.rule: str | None = rule
 
 
-class ClusterUnreachableError(RequestFailedError):
+class TargetUnreachableError(RequestFailedError):
     def __init__(self, *, url: str, reason: str) -> None:
         super().__init__(reason=f"cannot reach {url}: {reason}")
 
 
-class ConnectionFailedError(ClusterUnreachableError):
+class ConnectionFailedError(TargetUnreachableError):
     pass
 
 
-class NoResponseError(ClusterUnreachableError):
+class NoResponseError(TargetUnreachableError):
     pass
+
+
+class TotalTimeoutError(NoResponseError):
+    def __init__(self, *, url: str, seconds: float) -> None:
+        super().__init__(url=url, reason=f"no full answer within {seconds} seconds")
+
+
+class InvalidTargetRequestError(RequestFailedError):
+    def __init__(self, *, url: str, reason: str) -> None:
+        super().__init__(reason=f"cannot send to {url}: {reason}")
 
 
 class ResponseRejectedError(RequestFailedError):

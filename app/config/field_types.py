@@ -5,12 +5,12 @@ from pydantic import BeforeValidator, Field
 from app.config.constants import (
     ERROR_STATUS_CODE_MAX,
     ERROR_STATUS_CODE_MIN,
-    HTTP_HEADER_NAME_PATTERN,
+    HTTP_TCHAR_PATTERN,
     MAX_PORT,
 )
 from app.config.utils import to_lower, to_upper
 
-type HeaderName = Annotated[str, Field(pattern=HTTP_HEADER_NAME_PATTERN)]
+type HeaderName = Annotated[str, Field(pattern=HTTP_TCHAR_PATTERN)]
 type LowercaseHeaderName = Annotated[HeaderName, BeforeValidator(func=to_lower)]
 type LogLevel = Annotated[
     Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], BeforeValidator(func=to_upper)

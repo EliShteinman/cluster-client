@@ -2,9 +2,10 @@ from fastapi import HTTPException, Request
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
+from app.config.headers import HeaderSettings
 from app.config.settings import Settings
 from app.logger.decorators import log_debug
-from app.models import ClusterRequest
+from app.models import TargetRequest
 
 
 @log_debug
@@ -13,18 +14,14 @@ async def read_body(*, request: Request) -> bytes:
 
 
 @log_debug
-def read_cluster_request(*, headers: dict[str, str], body: bytes, settings: Settings) -> ClusterRequest:
-    header_of_field: dict[str, str] = settings.headers.model_dump()
-    passed_through_headers: dict[str, str] = {
-        name: value
-        for name, value in headers.items()
-        if name in settings.forwarding.passed_through_request_headers
-    }
+def read_target_request(*, headers: dict[str, str], body: bytes, settings: Settings) -> TargetRequest:
+    header_of_field: dict[str, str] = own_headers(settings=settings.headers)
+    target_headers: dict[str, str] = headers_for_target(headers=headers, settings=settings.headers)
     try:
-        return ClusterRequest.model_validate(
+        request: TargetRequest = TargetRequest.model_validate(
             obj={
                 **{field: headers[name] for field, name in header_of_field.items() if name in headers},
-                "passed_through_headers": passed_through_headers,
+                "headers": target_headers,
                 "body": body,
             }
         )
@@ -36,6 +33,34 @@ def read_cluster_request(*, headers: dict[str, str], body: bytes, settings: Sett
                 for detail in error.errors(include_url=False, include_input=False)
             ],
         ) from error
+    refused: list[str] = refused_headers(target_headers=target_headers, settings=settings.headers)
+    if refused:
+        raise HTTPException(
+            status_code=settings.failures.invalid_request.status_code,
+            detail=settings.headers.refused_reason.format(headers=", ".join(refused)),
+        )
+    return request
+
+
+@log_debug
+def own_headers(*, settings: HeaderSettings) -> dict[str, str]:
+    return {"method": settings.method, "url": settings.url}
+
+
+@log_debug
+def headers_for_target(*, headers: dict[str, str], settings: HeaderSettings) -> dict[str, str]:
+    return {
+        name.removeprefix(settings.target_prefix): value
+        for name, value in headers.items()
+        if name.startswith(settings.target_prefix)
+    }
+
+
+@log_debug
+def refused_headers(*, target_headers: dict[str, str], settings: HeaderSettings) -> list[str]:
+    return sorted(
+        settings.target_prefix + name for name in target_headers if name in settings.refused_target_headers
+    )
 
 
 @log_debug

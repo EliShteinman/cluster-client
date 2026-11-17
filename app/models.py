@@ -1,33 +1,35 @@
-from enum import StrEnum
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, HttpUrl, SecretStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter
 
-from app.config.utils import to_upper
+from app.config.constants import HTTP_TCHAR_PATTERN
+from app.logger.decorators import log_debug
+
+HTTP_URL: TypeAdapter[HttpUrl] = TypeAdapter(type=HttpUrl)
 
 
 class FrozenModel(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
 
-class HttpMethod(StrEnum):
-    GET = "GET"
-    POST = "POST"
-    PUT = "PUT"
-    PATCH = "PATCH"
-    DELETE = "DELETE"
+@log_debug
+def checked_http_url(url: str) -> str:
+    HTTP_URL.validate_python(url)
+    return url
 
 
-class ClusterRequest(FrozenModel):
-    method: Annotated[HttpMethod, BeforeValidator(func=to_upper)]
-    url: HttpUrl
-    authorization: SecretStr = Field(min_length=1)
-    content_type: str | None = Field(default=None)
-    passed_through_headers: dict[str, str] = Field(default_factory=dict)
+class TargetRequest(FrozenModel):
+    method: str = Field(
+        pattern=HTTP_TCHAR_PATTERN, description="Any HTTP method; sent to the target as received"
+    )
+    url: Annotated[str, AfterValidator(func=checked_http_url)] = Field(
+        description="An http or https URL; sent to the target exactly as received, query string included"
+    )
+    headers: dict[str, str] = Field(default_factory=dict)
     body: bytes = Field(default=b"")
 
 
-class ClusterResponse(FrozenModel):
+class TargetResponse(FrozenModel):
     status_code: int
     headers: dict[str, str] = Field(default_factory=dict)
     content: bytes = Field(default=b"")
@@ -54,10 +56,18 @@ class FailureDetails(FrozenModel):
 
 
 class RequestFailure(FailureDetails):
-    method: HttpMethod
+    method: str
     url: str
-    cluster_status_code: int | None = None
-    cluster_response: str | None = None
+    target_status_code: int | None = None
+    target_response: str | None = None
+
+
+class ErrorBodyLimits(FrozenModel):
+    error_length: int | None
+    rule_length: int | None
+    field_length: int | None
+    part_length: int | None
+    max_parts: int | None
 
 
 class HealthStatus(FrozenModel):

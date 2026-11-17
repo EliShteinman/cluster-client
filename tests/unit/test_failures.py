@@ -3,47 +3,49 @@ import json
 import logging
 import traceback
 from collections.abc import Callable
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException, Request, Response
-from jsonschema import Draft4Validator, Draft202012Validator
+from jsonschema.protocols import Validator
 
 from app.config.failures import FailureCode, FailureSettings
 from app.config.settings import NoEnvFileSettings, Settings
 from app.errors import (
     AccessDeniedError,
     ConnectionFailedError,
+    InvalidTargetRequestError,
     NoResponseError,
     RequestFailedError,
     ResponseRejectedError,
 )
-from app.failures.codes import failure_code
+from app.failures.answers import failed_request_answer, failure_code, redacted_content, request_failure
 from app.failures.handlers import access_denied_response, internal_error_response, refused_request_response
-from app.failures.log import failure_record, redacted_content
-from app.failures.response import failure_response
 from app.field_paths import FieldPath
-from app.models import ClusterResponse, RequestFailure
+from app.models import RequestFailure, TargetResponse
 from app.schema import validate_body
 from tests.support.access import ACCESS
-from tests.support.requests import CLUSTER_REQUEST, CLUSTER_URL
+from tests.support.requests import TARGET_REQUEST, TARGET_URL
+from tests.support.rules import DRAFT_04, RULES, validator_of
 
 SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
-CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=CLUSTER_URL, reason="refused")
-NO_RESPONSE: NoResponseError = NoResponseError(url=CLUSTER_URL, reason="read timed out")
+CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=TARGET_URL, reason="refused")
+NO_RESPONSE: NoResponseError = NoResponseError(url=TARGET_URL, reason="read timed out")
 REJECTION: ResponseRejectedError = ResponseRejectedError(
     field="$.uid", reason="'one' is not of type 'integer'"
 )
-CLUSTER_RESPONSE: ClusterResponse = ClusterResponse(status_code=200, content=b'{"uid": "one"}')
+TARGET_RESPONSE: TargetResponse = TargetResponse(status_code=200, content=b'{"uid": "one"}')
 REDACT_PASSWORD: tuple[FieldPath, ...] = (("password",),)
 REQUEST: Request = Request(
-    scope={"type": "http", "app": SimpleNamespace(state=SimpleNamespace(settings=SETTINGS))}
+    scope={
+        "type": "http",
+        "app": SimpleNamespace(state=SimpleNamespace(settings=SETTINGS, rules=RULES)),
+    }
 )
 
 
 LONG_TEXT: str = "too long " * 400
-HUGE_TEXT: str = "x" * (SETTINGS.failures.part_length * 500 + 10)
+HUGE_TEXT: str = "x" * ((RULES.error_limits.part_length or 0) * 500 + 10)
 HUGE_REJECTION: ResponseRejectedError = ResponseRejectedError(
     rule="anyOf", field="$" + ".a" * 300, reason=HUGE_TEXT
 )
@@ -51,17 +53,15 @@ LONG_REJECTION: ResponseRejectedError = ResponseRejectedError(
     rule="anyOf", field="$" + ".a" * 300, reason=LONG_TEXT
 )
 NOT_JSON: ResponseRejectedError = ResponseRejectedError(rule="not_json", field="$", reason=LONG_TEXT)
-LONG_CONNECTION_FAILURE: ConnectionFailedError = ConnectionFailedError(url=CLUSTER_URL, reason=LONG_TEXT)
-LONG_NO_RESPONSE: NoResponseError = NoResponseError(url=CLUSTER_URL, reason=LONG_TEXT)
+LONG_CONNECTION_FAILURE: ConnectionFailedError = ConnectionFailedError(url=TARGET_URL, reason=LONG_TEXT)
+LONG_NO_RESPONSE: NoResponseError = NoResponseError(url=TARGET_URL, reason=LONG_TEXT)
 HEADER_ERRORS: list[dict[str, object]] = [
-    {"type": "missing", "loc": ["x-cluster-url"], "msg": LONG_TEXT} for _ in range(3)
+    {"type": "missing", "loc": ["x-edge-url"], "msg": LONG_TEXT} for _ in range(3)
 ]
-FIREWALL: Draft4Validator = Draft4Validator(
-    schema=json.loads(s=(Path(__file__).parents[1] / "support" / "firewall-response-schema.json").read_text())
-)
+FIREWALL: Validator = RULES.schema_validator
 REDACT_ADMIN_PASSWORD: tuple[FieldPath, ...] = (("authentication_admin_pass",),)
 BDB_WITH_PASSWORD: bytes = b'{"uid": 1, "name": "db", "authentication_admin_pass": "TOPSECRET"}'
-TOO_MANY_PROPERTIES: Draft202012Validator = Draft202012Validator(schema={"maxProperties": 1})
+TOO_MANY_PROPERTIES: Validator = validator_of(schema={"$schema": DRAFT_04, "maxProperties": 1})
 
 
 def password_rejection() -> ResponseRejectedError:
@@ -82,8 +82,8 @@ def raised_error(*, message: str = "disk is full") -> ValueError:
         return error
 
 
-def content_of(*, answer: ClusterResponse | Response) -> bytes:
-    return answer.content if isinstance(answer, ClusterResponse) else bytes(answer.body)
+def content_of(*, answer: TargetResponse | Response) -> bytes:
+    return answer.content if isinstance(answer, TargetResponse) else bytes(answer.body)
 
 
 def reason_of(*, response: Response) -> str:
@@ -91,28 +91,33 @@ def reason_of(*, response: Response) -> str:
 
 
 def record_of(*, failure: RequestFailedError) -> RequestFailure:
-    return failure_record(
-        request=CLUSTER_REQUEST,
+    return request_failure(
+        request=TARGET_REQUEST,
         failure=failure,
-        cluster_response=None,
+        error_code="response_rejected",
+        target_response=None,
         redacted_fields=REDACT_PASSWORD,
-        settings=SETTINGS.failures,
     )
 
 
-def record(*, cluster_response: ClusterResponse | None) -> RequestFailure:
-    return failure_record(
-        request=CLUSTER_REQUEST,
+def record(*, target_response: TargetResponse | None) -> RequestFailure:
+    return request_failure(
+        request=TARGET_REQUEST,
         failure=REJECTION,
-        cluster_response=cluster_response,
+        error_code="response_rejected",
+        target_response=target_response,
         redacted_fields=REDACT_PASSWORD,
-        settings=SETTINGS.failures,
     )
 
 
 @pytest.mark.parametrize(
     ("failure", "error_code"),
-    [(CONNECTION_FAILED, "connection_failed"), (NO_RESPONSE, "timeout"), (REJECTION, "response_rejected")],
+    [
+        (CONNECTION_FAILED, "connection_failed"),
+        (NO_RESPONSE, "timeout"),
+        (REJECTION, "response_rejected"),
+        (InvalidTargetRequestError(url=TARGET_URL, reason="bad url"), "invalid_request"),
+    ],
 )
 def test_each_failure_gets_its_configured_code(failure: RequestFailedError, error_code: str) -> None:
     assert failure_code(failure=failure, settings=FailureSettings()).error_code == error_code
@@ -120,10 +125,10 @@ def test_each_failure_gets_its_configured_code(failure: RequestFailedError, erro
 
 def test_record_leaves_out_the_redacted_fields() -> None:
     failure: RequestFailure = record(
-        cluster_response=ClusterResponse(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
+        target_response=TargetResponse(status_code=200, content=b'{"uid": "one", "password": "s3cret"}')
     )
 
-    assert json.loads(s=failure.cluster_response or "") == {"uid": "one"}
+    assert json.loads(s=failure.target_response or "") == {"uid": "one"}
 
 
 def test_content_that_is_not_json_is_kept_as_text() -> None:
@@ -135,23 +140,32 @@ def test_response_uses_the_configured_status_code() -> None:
         access=ACCESS, failures=FailureSettings(rejected=FailureCode(status_code=422, error_code="bad"))
     )
 
-    assert failure_response(failure=REJECTION, cluster_response=None, settings=settings).status_code == 422
+    assert (
+        failed_request_answer(
+            request=TARGET_REQUEST, failure=REJECTION, target_response=None, rules=RULES, settings=settings
+        ).status_code
+        == 422
+    )
 
 
 def test_response_is_marked_with_the_error_code() -> None:
-    response: ClusterResponse = failure_response(
-        failure=NO_RESPONSE, cluster_response=None, settings=SETTINGS
+    response: TargetResponse = failed_request_answer(
+        request=TARGET_REQUEST, failure=NO_RESPONSE, target_response=None, rules=RULES, settings=SETTINGS
     )
 
     assert response.headers["x-edge-error"] == "timeout"
 
 
-def test_rejection_carries_the_cluster_status() -> None:
-    response: ClusterResponse = failure_response(
-        failure=REJECTION, cluster_response=ClusterResponse(status_code=201), settings=SETTINGS
+def test_rejection_carries_the_target_status() -> None:
+    response: TargetResponse = failed_request_answer(
+        request=TARGET_REQUEST,
+        failure=REJECTION,
+        target_response=TargetResponse(status_code=201),
+        rules=RULES,
+        settings=SETTINGS,
     )
 
-    assert response.headers["x-edge-cluster-status"] == "201"
+    assert response.headers["x-edge-target-status"] == "201"
 
 
 def test_a_refused_request_is_marked_as_our_own_answer() -> None:
@@ -193,20 +207,24 @@ def test_an_unexpected_error_returns_its_traceback() -> None:
 
 
 def test_rejected_password_is_left_out_of_the_answer() -> None:
-    response: ClusterResponse = failure_response(
-        failure=password_rejection(), cluster_response=None, settings=SETTINGS
+    response: TargetResponse = failed_request_answer(
+        request=TARGET_REQUEST,
+        failure=password_rejection(),
+        target_response=None,
+        rules=RULES,
+        settings=SETTINGS,
     )
 
     assert b"TOPSECRET" not in response.content
 
 
 def test_rejected_password_is_left_out_of_the_failure_record() -> None:
-    failure: RequestFailure = failure_record(
-        request=CLUSTER_REQUEST,
+    failure: RequestFailure = request_failure(
+        request=TARGET_REQUEST,
         failure=password_rejection(),
-        cluster_response=ClusterResponse(status_code=200, content=BDB_WITH_PASSWORD),
+        error_code="response_rejected",
+        target_response=TargetResponse(status_code=200, content=BDB_WITH_PASSWORD),
         redacted_fields=REDACT_ADMIN_PASSWORD,
-        settings=SETTINGS.failures,
     )
 
     assert "TOPSECRET" not in failure.model_dump_json()
@@ -215,10 +233,30 @@ def test_rejected_password_is_left_out_of_the_failure_record() -> None:
 @pytest.mark.parametrize(
     "answer",
     [
-        lambda: failure_response(failure=LONG_REJECTION, cluster_response=None, settings=SETTINGS),
-        lambda: failure_response(failure=NOT_JSON, cluster_response=None, settings=SETTINGS),
-        lambda: failure_response(failure=LONG_CONNECTION_FAILURE, cluster_response=None, settings=SETTINGS),
-        lambda: failure_response(failure=LONG_NO_RESPONSE, cluster_response=None, settings=SETTINGS),
+        lambda: failed_request_answer(
+            request=TARGET_REQUEST,
+            failure=LONG_REJECTION,
+            target_response=None,
+            rules=RULES,
+            settings=SETTINGS,
+        ),
+        lambda: failed_request_answer(
+            request=TARGET_REQUEST, failure=NOT_JSON, target_response=None, rules=RULES, settings=SETTINGS
+        ),
+        lambda: failed_request_answer(
+            request=TARGET_REQUEST,
+            failure=LONG_CONNECTION_FAILURE,
+            target_response=None,
+            rules=RULES,
+            settings=SETTINGS,
+        ),
+        lambda: failed_request_answer(
+            request=TARGET_REQUEST,
+            failure=LONG_NO_RESPONSE,
+            target_response=None,
+            rules=RULES,
+            settings=SETTINGS,
+        ),
         lambda: refused_request_response(REQUEST, HTTPException(status_code=400, detail=HEADER_ERRORS)),
         lambda: internal_error_response(REQUEST, raised_error(message=LONG_TEXT)),
         lambda: access_denied_response(REQUEST, AccessDeniedError(header="authorization")),
@@ -233,7 +271,7 @@ def test_rejected_password_is_left_out_of_the_failure_record() -> None:
         "unauthorized",
     ],
 )
-def test_every_own_answer_passes_the_firewall(answer: Callable[[], ClusterResponse | Response]) -> None:
+def test_every_own_answer_passes_the_firewall(answer: Callable[[], TargetResponse | Response]) -> None:
     assert FIREWALL.is_valid(instance=json.loads(s=content_of(answer=answer())))
 
 

@@ -1,4 +1,3 @@
-import sys
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -22,25 +21,22 @@ class FailureSettings(BaseConfig):
     no_response: FailureCode = Field(default=FailureCode(status_code=504, error_code="timeout"))
     internal_error: FailureCode = Field(default=FailureCode(status_code=500, error_code="internal_error"))
     error_header: HeaderName = Field(default="x-edge-error")
-    cluster_status_header: HeaderName = Field(default="x-edge-cluster-status")
+    target_status_header: HeaderName = Field(default="x-edge-target-status")
+    content_type_header: HeaderName = Field(default="content-type")
     content_type: str = Field(default="application/json")
-    part_length: int = Field(default=256, gt=0)
-    max_parts: int = Field(default=500, gt=1)
     shortened_field_prefix: str = Field(default="...")
     unsent_characters_message: str = Field(default="{count} more characters were not sent")
     not_json_rule: str = Field(default="not_json")
     not_json_reason: str = Field(default="the response body is not JSON: {error}")
+    too_deep_rule: str = Field(default="too_deep")
+    too_deep_reason: str = Field(default="the response body is nested too deeply to be checked")
     redacted_reason: str = Field(default="the failing value is a redacted field")
 
     @model_validator(mode="after")
-    def fit_the_part_length(self) -> Self:
+    def known_placeholders(self) -> Self:
         try:
-            unsent_message: str = self.unsent_characters_message.format(count=sys.maxsize)
+            self.unsent_characters_message.format(count=0)
             self.not_json_reason.format(error="")
         except (KeyError, IndexError, ValueError) as error:
             raise ValueError(f"a failure message has an unknown placeholder: {error}") from error
-        if len(unsent_message) > self.part_length:
-            raise ValueError("unsent_characters_message must fit in part_length")
-        if len(self.shortened_field_prefix) >= self.part_length:
-            raise ValueError("shortened_field_prefix must be shorter than part_length")
         return self

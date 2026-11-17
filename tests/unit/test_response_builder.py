@@ -1,45 +1,52 @@
 import json
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema.protocols import Validator
 from pydantic import JsonValue
 
 from app.config.failures import FailureSettings
 from app.errors import ResponseRejectedError
 from app.field_paths import FieldPath
-from app.models import ClusterResponse
+from app.models import TargetResponse
 from app.response_builder import build_response
 from app.rules import ResponseRules
+from tests.support.rules import DRAFT_04, RULES, validator_of
 
 DATABASE_SCHEMA: dict[str, JsonValue] = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$schema": DRAFT_04,
     "type": "object",
     "properties": {"uid": {"type": "integer"}, "name": {"type": "string"}},
     "required": ["uid"],
     "additionalProperties": False,
 }
-SCHEMA: Draft202012Validator = Draft202012Validator(schema=DATABASE_SCHEMA)
+SCHEMA: Validator = validator_of(schema=DATABASE_SCHEMA)
+DEEP_BODY: bytes = b"[" * 100_000 + b"]" * 100_000
 IGNORE_INTERNAL: tuple[FieldPath, ...] = (("internal",),)
 
 
 def rules_ignoring(*, ignored_fields: tuple[FieldPath, ...]) -> ResponseRules:
-    return ResponseRules(schema_validator=SCHEMA, ignored_fields=ignored_fields, redacted_fields=())
+    return ResponseRules(
+        schema_validator=SCHEMA,
+        ignored_fields=ignored_fields,
+        redacted_fields=(),
+        error_limits=RULES.error_limits,
+    )
 
 
-def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> ClusterResponse:
+def build(*, content: bytes, ignored_fields: tuple[FieldPath, ...] = ()) -> TargetResponse:
     return build_response(
-        cluster_response=ClusterResponse(status_code=200, headers={"x-cluster": "1"}, content=content),
+        target_response=TargetResponse(status_code=200, headers={"x-answer": "1"}, content=content),
         rules=rules_ignoring(ignored_fields=ignored_fields),
         settings=FailureSettings(),
     )
 
 
 def test_empty_body_is_returned_as_is() -> None:
-    empty: ClusterResponse = ClusterResponse(status_code=204)
+    empty: TargetResponse = TargetResponse(status_code=204)
 
     assert (
         build_response(
-            cluster_response=empty, rules=rules_ignoring(ignored_fields=()), settings=FailureSettings()
+            target_response=empty, rules=rules_ignoring(ignored_fields=()), settings=FailureSettings()
         )
         is empty
     )
@@ -72,12 +79,25 @@ def test_schema_violation_is_rejected_with_the_failing_field() -> None:
 
 
 def test_ignored_field_no_longer_breaks_the_schema() -> None:
-    built: ClusterResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
+    built: TargetResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
 
     assert json.loads(s=built.content) == {"uid": 1}
 
 
 def test_removing_a_field_keeps_status_and_headers() -> None:
-    built: ClusterResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
+    built: TargetResponse = build(content=b'{"uid": 1, "internal": 5}', ignored_fields=IGNORE_INTERNAL)
 
-    assert (built.status_code, built.headers) == (200, {"x-cluster": "1"})
+    assert (built.status_code, built.headers) == (200, {"x-answer": "1"})
+
+
+@pytest.mark.parametrize("content", [b'{"uid": NaN}', b'{"uid": Infinity}', b'{"uid": -Infinity}'])
+def test_non_standard_number_is_rejected_as_not_json(content: bytes) -> None:
+    with pytest.raises(ResponseRejectedError) as raised:
+        build(content=content)
+
+    assert raised.value.rule == "not_json"
+
+
+def test_deeply_nested_body_is_rejected() -> None:
+    with pytest.raises(ResponseRejectedError):
+        build(content=DEEP_BODY, ignored_fields=IGNORE_INTERNAL)

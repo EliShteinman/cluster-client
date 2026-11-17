@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException
 from app.config.constants import DISTRIBUTION_NAME
 from app.config.settings import Settings
 from app.errors import AccessDeniedError
+from app.failures.fit_check import check_own_answers
 from app.failures.handlers import (
     access_denied_response,
     internal_error_response,
@@ -19,8 +20,8 @@ from app.failures.handlers import (
 from app.logger.decorators import log_debug
 from app.logger.quiet import QuietPathsMiddleware
 from app.logger.setup import configure_logging, reset_logging
-from app.routes.cluster_routes import build_cluster_router
 from app.routes.health_routes import health_router
+from app.routes.target_routes import build_target_router
 from app.rules import load_rules
 from app.telemetry import build_tracer_provider, start_telemetry, stop_telemetry
 
@@ -43,7 +44,7 @@ def create_app(*, settings: Settings) -> FastAPI:
     app.exception_handler(exc_class_or_status_code=AccessDeniedError)(access_denied_response)
     app.exception_handler(exc_class_or_status_code=Exception)(internal_error_response)
     app.include_router(router=health_router)
-    app.include_router(router=build_cluster_router(settings=settings))
+    app.include_router(router=build_target_router(settings=settings))
     return app
 
 
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     configure_logging(settings=settings.log)
     start_telemetry(provider=tracer_provider)
     app.state.rules = load_rules(settings=settings.validation)
+    check_own_answers(rules=app.state.rules, settings=settings)
     yield
     stop_telemetry(provider=tracer_provider)
     reset_logging()

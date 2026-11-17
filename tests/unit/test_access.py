@@ -18,7 +18,7 @@ def test_the_configured_credentials_are_let_in() -> None:
         {"authorization": "Basic bWFuYWdlcjp3cm9uZw=="},
         {"authorization": ACCESS_HEADER_VALUE.replace("Basic", "Bearer")},
         {"authorization": ACCESS_HEADER_VALUE.replace("Basic ", "Basic")},
-        {"x-cluster-authorization": ACCESS_HEADER_VALUE},
+        {"x-target-authorization": ACCESS_HEADER_VALUE},
     ],
     ids=["missing", "empty", "wrong password", "wrong scheme", "no space", "other header"],
 )

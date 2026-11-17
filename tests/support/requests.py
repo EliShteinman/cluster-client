@@ -1,11 +1,11 @@
-from app.models import ClusterRequest
+from app.models import TargetRequest
 
-CLUSTER_URL: str = "https://cluster:9443/v1/bdbs/1"
-CLUSTER_HEADERS: dict[str, str] = {
-    "x-cluster-method": "GET",
-    "x-cluster-url": CLUSTER_URL,
-    "x-cluster-authorization": "Basic abc",
+TARGET_URL: str = "https://cluster:9443/v1/bdbs/1"
+TARGET_HEADERS: dict[str, str] = {
+    "x-edge-method": "GET",
+    "x-edge-url": TARGET_URL,
+    "x-target-authorization": "Basic abc",
 }
-CLUSTER_REQUEST: ClusterRequest = ClusterRequest.model_validate(
-    obj={"method": "GET", "url": CLUSTER_URL, "authorization": CLUSTER_HEADERS["x-cluster-authorization"]}
+TARGET_REQUEST: TargetRequest = TargetRequest(
+    method="GET", url=TARGET_URL, headers={"authorization": "Basic abc"}
 )

@@ -5,85 +5,97 @@ from fastapi import HTTPException
 from pydantic_core import ErrorDetails
 
 from app.config.failures import FailureCode, FailureSettings
-from app.config.forwarding import ForwardingSettings
 from app.config.headers import HeaderSettings
 from app.config.settings import NoEnvFileSettings, Settings
-from app.models import ClusterRequest, HttpMethod
-from app.routes.read_request import read_cluster_request
+from app.models import TargetRequest
+from app.routes.read_request import read_target_request
 from tests.support.access import ACCESS
-from tests.support.requests import CLUSTER_HEADERS, CLUSTER_URL
+from tests.support.requests import TARGET_HEADERS, TARGET_URL
 
 SETTINGS: Settings = NoEnvFileSettings(
     access=ACCESS,
     failures=FailureSettings(invalid_request=FailureCode(status_code=422, error_code="bad_request")),
-    forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"x-task-id"})),
 )
+UNNORMALIZED_URL: str = "https://Cluster:443/v1/bdbs?name=a b&fields=uid,name"
 
 
-def test_configured_headers_become_the_cluster_request() -> None:
-    request: ClusterRequest = read_cluster_request(headers=CLUSTER_HEADERS, body=b"{}", settings=SETTINGS)
-
-    assert (request.method, str(request.url), request.body) == (HttpMethod.GET, CLUSTER_URL, b"{}")
+def read(*, headers: dict[str, str], settings: Settings = SETTINGS) -> TargetRequest:
+    return read_target_request(headers=headers, body=b"", settings=settings)
 
 
-@pytest.mark.parametrize("missing", ["x-cluster-method", "x-cluster-url", "x-cluster-authorization"])
-def test_missing_header_is_refused_with_the_configured_status(missing: str) -> None:
-    headers: dict[str, str] = {name: value for name, value in CLUSTER_HEADERS.items() if name != missing}
-
+def refusal(*, headers: dict[str, str]) -> HTTPException:
     with pytest.raises(HTTPException) as raised:
-        read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
+        read(headers=headers)
+    return raised.value
 
-    assert raised.value.status_code == 422
+
+def without(*, name: str) -> dict[str, str]:
+    return {header: value for header, value in TARGET_HEADERS.items() if header != name}
+
+
+def test_own_headers_become_the_target_request() -> None:
+    request: TargetRequest = read_target_request(headers=TARGET_HEADERS, body=b"{}", settings=SETTINGS)
+
+    assert (request.method, request.url, request.body) == ("GET", TARGET_URL, b"{}")
+
+
+@pytest.mark.parametrize("missing", ["x-edge-method", "x-edge-url"])
+def test_missing_own_header_is_refused_with_the_configured_status(missing: str) -> None:
+    assert refusal(headers=without(name=missing)).status_code == 422
 
 
 def test_refusal_names_the_missing_header() -> None:
+    details: list[ErrorDetails] = cast(
+        typ=list[ErrorDetails], val=refusal(headers=without(name="x-edge-url")).detail
+    )
+
+    assert [detail["loc"] for detail in details] == [("x-edge-url",)]
+
+
+def test_own_header_names_come_from_the_given_settings() -> None:
+    settings: Settings = NoEnvFileSettings(access=ACCESS, headers=HeaderSettings(method="X-Verb"))
+    headers: dict[str, str] = {**without(name="x-edge-method"), "x-verb": "POST"}
+
+    assert read(headers=headers, settings=settings).method == "POST"
+
+
+def test_target_headers_are_sent_without_the_prefix() -> None:
+    headers: dict[str, str] = {**TARGET_HEADERS, "x-target-cluster-state-id": "155"}
+
+    assert read(headers=headers).headers == {"authorization": "Basic abc", "cluster-state-id": "155"}
+
+
+def test_no_other_header_reaches_the_target() -> None:
     headers: dict[str, str] = {
-        name: value for name, value in CLUSTER_HEADERS.items() if name != "x-cluster-url"
+        **TARGET_HEADERS,
+        "authorization": "Basic access",
+        "x-forwarded-for": "10.0.0.1",
     }
 
-    with pytest.raises(HTTPException) as raised:
-        read_cluster_request(headers=headers, body=b"", settings=SETTINGS)
-
-    details: list[ErrorDetails] = cast(typ=list[ErrorDetails], val=raised.value.detail)
-    assert [detail["loc"] for detail in details] == [("x-cluster-url",)]
+    assert read(headers=headers).headers == {"authorization": "Basic abc"}
 
 
-def test_header_names_come_from_the_given_settings() -> None:
-    settings: Settings = NoEnvFileSettings(access=ACCESS, headers=HeaderSettings(method="X-Verb"))
-    headers: dict[str, str] = {**CLUSTER_HEADERS, "x-verb": "POST"}
-    del headers["x-cluster-method"]
-
-    assert read_cluster_request(headers=headers, body=b"", settings=settings).method == HttpMethod.POST
+def test_a_request_without_target_authorization_is_accepted() -> None:
+    assert read(headers=without(name="x-target-authorization")).headers == {}
 
 
-def test_every_header_setting_names_a_request_field() -> None:
-    assert set(HeaderSettings.model_fields) <= set(ClusterRequest.model_fields)
+@pytest.mark.parametrize("header", ["x-target-host", "x-target-content-length", "x-target-transfer-encoding"])
+def test_a_hop_by_hop_target_header_is_refused(header: str) -> None:
+    assert refusal(headers={**TARGET_HEADERS, header: "x"}).status_code == 422
 
 
-def test_configured_headers_are_passed_through() -> None:
-    request: ClusterRequest = read_cluster_request(
-        headers={**CLUSTER_HEADERS, "x-task-id": "t1"}, body=b"", settings=SETTINGS
-    )
-
-    assert request.passed_through_headers == {"x-task-id": "t1"}
+def test_the_url_is_kept_as_received() -> None:
+    assert read(headers={**TARGET_HEADERS, "x-edge-url": UNNORMALIZED_URL}).url == UNNORMALIZED_URL
 
 
-def test_passed_through_header_is_configured_in_any_case() -> None:
-    settings: Settings = NoEnvFileSettings(
-        access=ACCESS,
-        forwarding=ForwardingSettings(passed_through_request_headers=frozenset({"X-Task-Id"})),
-    )
-
-    request: ClusterRequest = read_cluster_request(
-        headers={**CLUSTER_HEADERS, "x-task-id": "t1"}, body=b"", settings=settings
-    )
-
-    assert request.passed_through_headers == {"x-task-id": "t1"}
+def test_a_url_that_is_not_http_is_refused() -> None:
+    assert refusal(headers={**TARGET_HEADERS, "x-edge-url": "ftp://cluster/file"}).status_code == 422
 
 
-def test_other_headers_are_not_passed_through() -> None:
-    request: ClusterRequest = read_cluster_request(
-        headers={**CLUSTER_HEADERS, "x-other": "1"}, body=b"", settings=SETTINGS
-    )
+@pytest.mark.parametrize("method", ["PROPFIND", "get", "M-SEARCH"])
+def test_any_method_token_is_sent_as_received(method: str) -> None:
+    assert read(headers={**TARGET_HEADERS, "x-edge-method": method}).method == method
 
-    assert request.passed_through_headers == {}
+
+def test_a_method_that_is_not_a_token_is_refused() -> None:
+    assert refusal(headers={**TARGET_HEADERS, "x-edge-method": "GE T"}).status_code == 422

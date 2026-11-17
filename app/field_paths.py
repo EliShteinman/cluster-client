@@ -1,4 +1,3 @@
-import copy
 import re
 from pathlib import Path
 
@@ -40,25 +39,29 @@ def parse_field_path(*, field: str, path: Path) -> FieldPath:
 
 @log_debug
 def remove_fields(*, body: JsonValue, field_paths: tuple[FieldPath, ...]) -> JsonValue:
-    if not field_paths:
-        return body
-    cleaned: JsonValue = copy.deepcopy(x=body)
+    cleaned: JsonValue = body
     for field_path in field_paths:
-        remove_field(node=cleaned, field_path=field_path)
+        cleaned = without_field(node=cleaned, field_path=field_path)
     return cleaned
 
 
 @log_debug
-def remove_field(*, node: JsonValue, field_path: FieldPath) -> None:
+def without_field(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
     head, *rest = field_path
     if head == ALL_ITEMS:
-        children: list[JsonValue] = node if isinstance(node, list) else []
-    elif isinstance(node, dict) and head in node:
-        if not rest:
-            del node[head]
-            return
-        children = [node[head]]
-    else:
-        return
-    for child in children:
-        remove_field(node=child, field_path=tuple(rest))
+        return without_field_in_items(node=node, field_path=tuple(rest))
+    if not isinstance(node, dict) or head not in node:
+        return node
+    if not rest:
+        return {key: value for key, value in node.items() if key != head}
+    child: JsonValue = without_field(node=node[head], field_path=tuple(rest))
+    return node if child is node[head] else {**node, head: child}
+
+
+@log_debug
+def without_field_in_items(*, node: JsonValue, field_path: FieldPath) -> JsonValue:
+    if not isinstance(node, list):
+        return node
+    items: list[JsonValue] = [without_field(node=item, field_path=field_path) for item in node]
+    unchanged: bool = all(new is old for new, old in zip(items, node, strict=True))
+    return node if unchanged else items

@@ -1,3 +1,4 @@
+import time
 from io import BytesIO
 
 import requests
@@ -11,20 +12,27 @@ CONNECT_FAILURE: MaxRetryError = MaxRetryError(
 
 
 class SentRequest:
-    def __init__(self, *, method: str, url: str, data: bytes, allow_redirects: bool) -> None:
+    def __init__(
+        self, *, method: str, url: str, headers: dict[str, str], data: bytes, allow_redirects: bool
+    ) -> None:
         self.method: str = method
         self.url: str = url
+        self.headers: dict[str, str] = headers
         self.content: bytes = data
         self.allow_redirects: bool = allow_redirects
 
 
-class FakeClusterApi:
+class FakeTargetApi:
     def __init__(self) -> None:
         self.requests: list[SentRequest] = []
         self._error: requests.RequestException | None = None
+        self._delay_seconds: float = 0.0
 
     def fail_with(self, *, error: requests.RequestException) -> None:
         self._error = error
+
+    def answer_after(self, *, seconds: float) -> None:
+        self._delay_seconds = seconds
 
     def request(
         self,
@@ -37,7 +45,10 @@ class FakeClusterApi:
         allow_redirects: bool,
         verify: bool,
     ) -> requests.Response:
-        self.requests.append(SentRequest(method=method, url=url, data=data, allow_redirects=allow_redirects))
+        self.requests.append(
+            SentRequest(method=method, url=url, headers=headers, data=data, allow_redirects=allow_redirects)
+        )
+        time.sleep(self._delay_seconds)
         if self._error is not None:
             raise self._error
         response: requests.Response = requests.Response()

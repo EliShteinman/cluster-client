@@ -1,11 +1,11 @@
 import pytest
 
-from app import cluster_client
-from tests.support.fake_cluster_api import FakeClusterApi
+from app import target_client
+from tests.support.fake_target_api import FakeTargetApi
 
 
 @pytest.fixture
-def fake_cluster(monkeypatch: pytest.MonkeyPatch) -> FakeClusterApi:
-    fake: FakeClusterApi = FakeClusterApi()
-    monkeypatch.setattr(target=cluster_client.requests, name="request", value=fake.request)
+def fake_target(monkeypatch: pytest.MonkeyPatch) -> FakeTargetApi:
+    fake: FakeTargetApi = FakeTargetApi()
+    monkeypatch.setattr(target=target_client.requests, name="request", value=fake.request)
     return fake

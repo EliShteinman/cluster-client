@@ -63,4 +63,4 @@ class LoggingSettings(BaseConfig):
             logger_name="cluster_client.failures",
         )
     )
-    formatting: FormattingSettings = Field(default_factory=FormattingSettings)
+    formatting: FormattingSettings = Field(default=FormattingSettings())

@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema.protocols import Validator
 from pydantic import JsonValue
 
 from app.errors import ResponseRejectedError, SchemaLoadError
 from app.field_paths import FieldPath
 from app.schema import load_schema, validate_body
+from tests.support.rules import DRAFT_04, validator_of
 
 
 @pytest.mark.parametrize(
@@ -27,8 +28,9 @@ def test_unusable_schema_file_is_reported(tmp_path: Path, content: str | None) -
 REDACTED_FIELD: str = "authentication_admin_pass"
 REDACT_FIELD: tuple[FieldPath, ...] = ((REDACTED_FIELD,),)
 REDACTED_REASON: str = "the failing value is a redacted field"
-FIELD_SCHEMA: Draft202012Validator = Draft202012Validator(
+FIELD_SCHEMA: Validator = validator_of(
     schema={
+        "$schema": DRAFT_04,
         "type": "object",
         "properties": {REDACTED_FIELD: {"type": "string", "maxLength": 3}, "acl_uid": {"type": "integer"}},
         "maxProperties": 2,
@@ -36,11 +38,12 @@ FIELD_SCHEMA: Draft202012Validator = Draft202012Validator(
 )
 
 
-TIED_FAILURES_SCHEMA: Draft202012Validator = Draft202012Validator(
-    schema={"maxProperties": 2, "required": ["uid"]}
+TIED_FAILURES_SCHEMA: Validator = validator_of(
+    schema={"$schema": DRAFT_04, "maxProperties": 2, "required": ["uid"]}
 )
-NESTED_ANY_OF_SCHEMA: Draft202012Validator = Draft202012Validator(
+NESTED_ANY_OF_SCHEMA: Validator = validator_of(
     schema={
+        "$schema": DRAFT_04,
         "anyOf": [
             {
                 "properties": {
@@ -51,7 +54,7 @@ NESTED_ANY_OF_SCHEMA: Draft202012Validator = Draft202012Validator(
                     }
                 }
             }
-        ]
+        ],
     }
 )
 
@@ -59,7 +62,7 @@ NESTED_ANY_OF_SCHEMA: Draft202012Validator = Draft202012Validator(
 def rejection(
     *,
     body: JsonValue,
-    schema: Draft202012Validator = FIELD_SCHEMA,
+    schema: Validator = FIELD_SCHEMA,
     redacted_fields: tuple[FieldPath, ...] = REDACT_FIELD,
 ) -> ResponseRejectedError:
     with pytest.raises(ResponseRejectedError) as raised:

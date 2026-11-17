@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "cluster-client"
 version = "0.1.0"
-description = "Client for the Redis Enterprise REST API of the clusters in its network; validates every response against a schema"
+description = "Sends one request to the target named in it and returns the answer only if it passes the firewall schema"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.110",
@@ -69,9 +69,9 @@ exhaustive = true
 layers = [
     "main | server",
     "routes",
-    "access | failures | response_builder | cluster_client | telemetry",
+    "access | failures | response_builder | target_client | telemetry",
     "rules",
-    "schema",
+    "schema | schema_limits",
     "field_paths",
     "models | json_file",
     "logger",

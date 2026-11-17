@@ -5,4 +5,7 @@ metadata:
   labels:
     {{- include "cluster-client.labels" . | nindent 4 }}
 data:
-  {{- (.Files.Glob "files/*.json").AsConfig | nindent 2 }}
+  {{- range $name := list "response-schema.json" "ignored-fields.json" "redacted-fields.json" }}
+  {{ $name }}: |-
+    {{- $.Files.Get (printf "files/%s" $name) | required (printf "helm/files/%s is missing" $name) | nindent 4 }}
+  {{- end }}

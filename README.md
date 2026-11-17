@@ -8,7 +8,6 @@ the Redis Enterprise REST API of a cluster), checks the answer against the firew
 ```bash
 uv sync
 uv run pre-commit install
-cp .env.example .env
 ```
 
 ## Run
@@ -17,8 +16,15 @@ cp .env.example .env
 python run_local.py
 ```
 
-`run_local.py` sets local credentials (`manager` / `local-password`). Everywhere else the service does not start
-without `CLUSTER_CLIENT_ACCESS__USERNAME` and `CLUSTER_CLIENT_ACCESS__PASSWORD` (no defaults).
+`run_local.py` sets local credentials (`manager` / `local-password`) and its other settings in code; it ignores
+`.env` (`NoEnvFileSettings`). Everywhere else the service does not start without
+`CLUSTER_CLIENT_ACCESS__USERNAME` and `CLUSTER_CLIENT_ACCESS__PASSWORD` (no defaults). To run locally with settings
+from env and `.env`, as in the container:
+
+```bash
+cp .env.example .env   # then fill in the username and password
+PYTHONPATH=. uv run python docker/entrypoint.py
+```
 
 The app is built by `app.main.create_app(settings)`. Each environment passes its own `Settings`:
 
@@ -42,8 +48,9 @@ curl -X POST http://127.0.0.1:8000/ \
 
 - `authorization` is the manager's access: `Basic base64(username:password)`, the scheme in any case. It is never
   sent to the target. In `/docs`, click **Authorize** and enter the same username and password to try `POST /`.
-- `x-edge-method` (any HTTP method) and `x-edge-url` (an http or https URL) are read, never sent. Both go to the
-  target exactly as received, query string included.
+- `x-edge-method` (any HTTP method) and `x-edge-url` (an http or https URL, any length) are read, never sent.
+  Both go to the target as `requests` sends them (the method in upper case, the URL re-quoted), query string
+  included.
 - Every header that starts with `x-target-` is sent to the target without the prefix:
   `x-target-authorization` → `authorization`, `x-target-content-type` → `content-type`,
   `x-target-cluster-state-id` → `cluster-state-id`. No other header reaches the target, so a target without
@@ -54,7 +61,7 @@ curl -X POST http://127.0.0.1:8000/ \
 
 | Case | Status | `x-edge-error` | Body |
 |---|---|---|---|
-| Answer matches the schema | the target's | none | the target's, unchanged (with its headers, except any `x-edge-*`) |
+| Answer matches the schema | the target's | none | the target's: byte for byte, or re-encoded when an ignored field was removed; its headers, except any `x-edge-*` and those the server recomputes (`content-length`, `content-encoding`, `transfer-encoding`, `connection`) |
 | Answer is not standard JSON (`NaN`, `Infinity` included), too deeply nested, or breaks the schema | 502 | `response_rejected` | `{"error", "rule", "field", "reason"}` |
 | Request surely did not reach the target (refused, DNS, connect timeout) | 502 | `connection_failed` | `{"error", "reason"}` |
 | Request may have been sent, no full answer within the total timeout (timeout, connection cut, TLS error) | 504 | `timeout` | `{"error", "reason"}` |
@@ -81,8 +88,9 @@ Every body the cluster client writes itself passes the firewall's response schem
 - `reason`: the whole explanation in parts as long as the schema allows for one item of `reason` (256 today);
   joined, they are the full text. Above the number of items the schema allows (500 today), the last part says
   how many characters were not sent.
-- These limits are read from the schema at startup, never configured. If the schema cannot hold such a body, the
-  service does not start.
+- These limits are read from the schema at startup, never configured. If the schema sets no limit for one of
+  these fields (`maxLength` of `error`, `rule`, `field` and of each item of `reason`, `maxItems` of `reason`), is
+  recursive, or cannot hold such a body, the service does not start.
 - The explanation is built after removing the redacted fields, so no listed password reaches it; a failure in a
   redacted field itself is explained without its value. The original explanation is in the DEBUG log.
 
@@ -123,7 +131,9 @@ CLUSTER_CLIENT_FAILURES__REJECTED__STATUS_CODE=422     # FailureSettings.rejecte
 
 Only `CLUSTER_CLIENT_ACCESS__USERNAME` and `CLUSTER_CLIENT_ACCESS__PASSWORD` are required; set any other only to
 change its default. The usual ones are in `.env.example`. In the image, `SERVER__HOST`, `SERVER__PORT`,
-`VALIDATION__*_PATH` and `LOG__*__PATH` are set already. Lists are JSON (`["a", "b"]`).
+`VALIDATION__*_PATH` and `LOG__*__PATH` are set already. Lists are JSON (`["a", "b"]`). A misspelled field inside
+a section (`CLUSTER_CLIENT_FORWARDING__TIMEOUT_SECOND`) stops the service at startup; a name without a known
+section (`CLUSTER_CLIENT_FOO`) is ignored.
 
 ## Logging
 
@@ -181,7 +191,9 @@ and `traces-cluster_client.otel-default`. The Elastic user needs to write to the
 
 ```bash
 helm upgrade --install cluster-client ./helm -f helm/networks/<network>.yaml \
-  --set collector.elasticsearch.username=<user> --set collector.elasticsearch.password="$ELASTIC_PASSWORD" ...
+  --set secret.CLUSTER_CLIENT_ACCESS__USERNAME=<manager user> \
+  --set secret.CLUSTER_CLIENT_ACCESS__PASSWORD="$MANAGER_PASSWORD" \
+  --set collector.elasticsearch.username=<user> --set collector.elasticsearch.password="$ELASTIC_PASSWORD"
 ```
 
 The collector image (`otel/opentelemetry-collector-contrib`, `collector.image.tag`) is pulled from the same
@@ -213,9 +225,14 @@ docker run --rm -p 8000:8000 --read-only -v /app/logs -v "$PWD/helm/files:/etc/c
 ## Helm
 
 ```bash
-helm lint helm -f helm/networks/<network>.yaml
-helm upgrade --install cluster-client helm -f helm/networks/<network>.yaml
+helm lint helm -f helm/networks/<network>.yaml \
+  --set secret.CLUSTER_CLIENT_ACCESS__USERNAME=<manager user> --set secret.CLUSTER_CLIENT_ACCESS__PASSWORD=x
+helm upgrade --install cluster-client helm -f helm/networks/<network>.yaml \
+  --set secret.CLUSTER_CLIENT_ACCESS__USERNAME=<manager user> \
+  --set secret.CLUSTER_CLIENT_ACCESS__PASSWORD="$MANAGER_PASSWORD"
 ```
+
+`values.schema.json` requires both `secret` keys, so `helm lint` needs them too (any value).
 
 `helm/values.yaml` holds what every network shares. `helm/networks/<network>.yaml` holds only what differs in
 one network: `domain` (required), and if needed `image.tag` or `route.host`. `helm/values.schema.json` rejects
@@ -234,7 +251,7 @@ The three runtime files are read from `helm/files/` (`response-schema.json`, `ig
 | `domain` | the network's domain: suffix of the Artifactory host and of the route host |
 | `image` | `registry`, `repository`, `tag`, `pullPolicy` |
 | `route` | OpenShift Route: `name`, `host` (overrides `<name>.<domain>`), `tls` |
-| `config` | `CLUSTER_CLIENT_*` env vars (strings), rendered into a ConfigMap; the service checks the values when it starts |
+| `config` | `CLUSTER_CLIENT_*` env vars (strings), rendered into a ConfigMap; the service checks the values when it starts, and stops on a misspelled field inside a section |
 | `secret` | `CLUSTER_CLIENT_*` env vars, rendered into a Secret; must hold `CLUSTER_CLIENT_ACCESS__USERNAME` and `CLUSTER_CLIENT_ACCESS__PASSWORD` (pass them with `--set`, never in a file in git) |
 | `collector` | `enabled`, `image`, `logLevel`, `elasticsearch` (`endpoint`, `username`, `password`, `insecureSkipVerify`), `resources`: the sidecar that sends logs and traces to Elastic |
 | `resources` | requests / limits |

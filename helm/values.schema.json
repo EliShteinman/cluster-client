@@ -276,7 +276,7 @@
       "maximum": 65535
     },
     "environment": {
-      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value when it starts (README, Configuration). The image sets the host and port.",
+      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value, and every field name inside a section, when it starts (README, Configuration). The image sets the host and port.",
       "type": "object",
       "propertyNames": {
         "pattern": "^CLUSTER_CLIENT_[A-Z0-9_]+$",

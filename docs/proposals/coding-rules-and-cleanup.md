@@ -1,5 +1,9 @@
 # הצעה: כללי קוד וסידור, לפי redis-enterprise-services
 
+> **History.** This proposal is kept as a record of how decisions were reached. It does not describe the current
+> code. The current rules and decisions are in [`AGENTS.md`](../../AGENTS.md); the service is described in
+> [`docs/`](../README.md).
+
 **סטטוס:** היסטורי. עברנו על הנקודות. ההחלטות למטה גוברות על מה שכתוב בהמשך המסמך, ו-`AGENTS.md` גובר על שתיהן.
 סעיף 3 (ניקיון ותלויות) עדיין פתוח.
 **עדכון 2026-11-17:**

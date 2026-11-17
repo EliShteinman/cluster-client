@@ -45,10 +45,10 @@ one visible call:
    - a body nested too deeply for Python (`RecursionError`) → `ResponseRejectedError`, rule `too_deep_rule`;
    - if X removed nothing → the **original** response object is returned; else the body is re-encoded.
 6. On any `RequestFailedError`: `failed_request_answer` (`app/failures/answers.py`) picks the `FailureCode` once,
-   builds the `RequestFailure` once (the target's answer without the redacted fields), and `logged_answer` writes
+   builds the `FailureRecord` once (the target's answer without the redacted fields), and `logged_answer` writes
    it whole to the failure log file and builds the answer: `x-edge-error`, and when the target answered,
    `x-edge-target-status`; only the answer is cut (`failure_body`, `app/failures/body.py`). Anything else the
-   service answers itself goes through the handlers of `app/failures/handlers.py` and the same `logged_answer`,
+   service answers itself goes through the handlers of `app/failures/exception_handlers.py` and the same `logged_answer`,
    so every such answer has `x-edge-error`: `AccessDeniedError` → `unauthorized`; `HTTPException` (bad headers,
    wrong path, wrong method) → `invalid_request`; any other exception → `internal_error`.
 7. The route returns status + headers + body; OpenTelemetry adds `traceresponse`.
@@ -62,22 +62,22 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 | `app/main.py` | `create_app(settings)` (factory: builds the app's `TracerProvider`, `FastAPIInstrumentor`) and `lifespan` (startup: configure logging, start telemetry, load the `ResponseRules` into `app.state.rules`, `check_own_answers`; shutdown: stop telemetry) |
 | `app/server.py` | `serve()` → `uvicorn.run` |
 | `app/telemetry.py` | `build_tracer_provider` (one per app, never global), `start_telemetry` / `stop_telemetry`: instrument and uninstrument `requests` and logs |
-| `app/config/` | **every** setting. Import layers `constants` and `utils` → `field_types` and `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, env prefix…), `utils.py` (`to_upper`, `to_lower`), `field_types.py` (`HeaderName`, `LowercaseHeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the frozen `BaseModel` every section extends, `extra="forbid"`; sections never read env), one file per section (`server.py`, `access.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`, the only `BaseSettings`: env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`; `NoEnvFileSettings` ignores `.env`) |
-| `app/models.py` | `FrozenModel` (base of the data models), `TargetRequest` (method: any HTTP token; url: checked as an http(s) URL, kept as received; headers; body), `TargetResponse`, `FailureBody`, `FailureDetails`, `RequestFailure`, `ErrorBodyLimits`, `HealthStatus` |
-| `app/errors.py` | `ClusterClientError` → `AccessDeniedError`, `NonStandardJsonError`, `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `TargetUnreachableError` (→ `ConnectionFailedError`, `NoResponseError` → `TotalTimeoutError`), `InvalidTargetRequestError`, `ResponseRejectedError` |
+| `app/config/` | **every** setting. Import layers `constants` → `field_types` and `base` → sections → `settings` (enforced by the `config layers` contract): `constants.py` (fixed values nobody may change that several files use: `TEXT_ENCODING`, `DISTRIBUTION_NAME`, `HTTP_TCHAR_PATTERN`; a fixed value with one user sits at the top of that file, e.g. `MAX_PORT` in `field_types.py`, `BASIC_USERNAME_PATTERN` in `access.py`, `ENV_PREFIX` in `settings.py`), `field_types.py` (`to_upper`, `to_lower`, `HeaderName`, `LowercaseHeaderName`, `LogLevel`, `ErrorStatusCode`, `Port`), `base.py` (`BaseConfig`: the frozen `BaseModel` every section extends, `extra="forbid"`; sections never read env), one file per section (`server.py`, `application.py`, `access.py`, `headers.py`, `forwarding.py`, `validation.py`, `failures.py`, `logging.py`, `telemetry.py`; a section never imports another), `settings.py` (root `Settings`, the only `BaseSettings`: env prefix `CLUSTER_CLIENT_`, nested `__`, `.env`; `NoEnvFileSettings` ignores `.env`) |
+| `app/models.py` | `FrozenModel` (base of the data models), `TargetRequest` (method: any HTTP token; url: checked as an http(s) URL, kept as received; headers; body), `Answer` (status, headers, content: the target's answer or one the service writes itself), `FailureBody`, `FailureDetails`, `FailureRecord`, `ErrorBodyLimits`, `HealthStatus` |
+| `app/errors.py` | `ClusterClientError` → `AccessDeniedError`, `NonStandardJsonError`, `ConfigFileLoadError` (→ `SchemaLoadError`, `FieldPathsLoadError`), `RequestFailedError` → `TargetUnreachableError` (→ `ConnectionFailedError`, `NoResponseError`), `InvalidTargetRequestError`, `ResponseRejectedError` |
 | `app/routes/target_routes.py` | `build_target_router(settings)`, `require_access` (dependency of `POST /`) and the `POST /` orchestrator `target_endpoint` |
 | `app/routes/target_openapi.py` | the OpenAPI of `POST /` from the settings: the forwarding rule, the own headers, the documented `x-target-*` headers, every failure status with `FailureBody` and its headers |
-| `app/routes/read_request.py` | `read_body` (async, see below), `read_target_request` (own headers, `x-target-*` without the prefix, refused headers), `own_headers`, `named_by_header` |
+| `app/routes/read_request.py` | `read_body` (async, see below), `read_target_request` (own headers, `x-target-*` without the prefix, refused headers), `header_of_field`, `named_by_header` |
 | `app/routes/health_routes.py` | `/health/live`, `/health/ready` (both return `up`; real readiness is a TODO) |
-| `app/access.py` | `check_access` (gets only the access header value) and `expected_credentials`, both not decorated: they hold the password |
-| `app/target_client.py` | `send_to_target` (total timeout), `call_target`, `unreachable_error`, `was_not_sent`, `returned_headers` |
+| `app/access.py` | `check_access` (gets only the access header value) and `expected_credentials`, both not decorated: they hold the password; `login_challenge` (the `www-authenticate` value, sent on 401 and shown in `/docs`) |
+| `app/target_client.py` | `send_to_target` (total timeout), `call_target`, `classified_error`, `was_not_sent`, `returned_headers` |
 | `app/response_builder.py` | `build_response(target_response, rules, settings)`, `too_deep` |
 | `app/rules.py` | `ResponseRules` (schema validator, ignored and redacted fields, `error_limits`) and `load_rules` |
-| `app/json_file.py` | `read_json_file` (reads one of the runtime JSON files), `read_json_body` (strict: `NaN`/`Infinity` refused) |
+| `app/json_reading.py` | `read_json_file` (reads one of the runtime JSON files), `read_json_body` (strict: `NaN`/`Infinity` refused) |
 | `app/field_paths.py` | `load_field_paths`, `parse_field_path`, `remove_fields`, `without_field`, `without_field_in_items` (used for ignored and redacted fields) |
 | `app/schema.py` | `load_schema` (`validator_for`: the draft the schema declares), `validate_body`, `violation_at`, `every_error`, `first_violation` |
 | `app/schema_limits.py` | `error_body_limits`: walks the schema (`$ref` inside the file, `anyOf`/`oneOf`/`allOf`, `properties`/`patternProperties`/`additionalProperties`, `items`) along the field paths of our own error body (`$.error`, `$.rule`, `$.field`, `$.reason`, `$.reason[*]`, parsed by `parse_field_path`); the smallest limit of all branches wins; a path without a limit stops the start |
-| `app/failures/` | `answers.py` (`failed_request_answer`, `failure_code`, `request_failure`, `redacted_content`, `logged_answer`: the one place that logs a failure and builds its answer), `body.py` (`failure_body`, `reason_parts`, `shortened_field`), `fit_check.py` (`check_own_answers`: startup check that the schema holds every own answer), `handlers.py` (`refused_request_response`, `access_denied_response` (adds the `www-authenticate` challenge), `internal_error_response`, `own_failure_answer`) |
+| `app/failures/` | `answers.py` (`failed_request_answer`, `failure_code`, `failure_codes` (every configured `FailureCode`), `failure_record`, `redacted_content`, `logged_answer`: the one place that logs a failure and builds its answer), `body.py` (`failure_body`, `reason_parts`, `shortened_field`), `own_answers_check.py` (`check_own_answers`: startup check that the schema holds every own answer), `exception_handlers.py` (`refused_request_response`, `access_denied_response` (adds the `www-authenticate` challenge), `internal_error_response`, `own_failure_answer`) |
 | `app/logger/formatters.py` | JSON + line formatters |
 | `app/logger/handlers.py` | terminal / file handlers |
 | `app/logger/setup.py` | `configure_logging`, `reset_logging` |
@@ -259,6 +259,3 @@ Diagrams of exactly this flow: `docs/diagrams/flow.drawio` (activity) and `docs/
 - A header sent twice (two `x-target-*` with the same name) reaches the target with its first value only
   (`dict(request.headers)`). To check (owner, 2026-11-17): how complicated it is to replace `dict[str, str]` with a
   type that keeps every value.
-- Check how hard it is to keep repeated headers: `dict(request.headers)` (`app/routes/target_routes.py`) keeps only
-  the first value of a header sent twice, so a repeated `x-target-*` reaches the target with its first value only.
-  Keeping all values means another type than `dict[str, str]` (e.g. `getlist`, joined with `, `).

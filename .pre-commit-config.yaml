@@ -3,11 +3,23 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: .venv/bin/ruff check --fix
+        entry: uv run --frozen ruff check --fix
         language: system
         types: [python]
       - id: ruff-format
         name: ruff format
-        entry: .venv/bin/ruff format
+        entry: uv run --frozen ruff format
         language: system
         types: [python]
+      - id: basedpyright
+        name: basedpyright
+        entry: uv run --frozen basedpyright
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: lint-imports
+        name: lint-imports
+        entry: uv run --frozen lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false

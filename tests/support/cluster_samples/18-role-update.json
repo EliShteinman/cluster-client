@@ -1,0 +1,18 @@
+{
+  "body": {
+    "management": "db_member",
+    "name": "probe-db-app-role",
+    "resources": [
+      {
+        "type": "db",
+        "uids": [
+          "9"
+        ]
+      }
+    ],
+    "uid": 3
+  },
+  "method": "PUT",
+  "path": "/v1/roles/3",
+  "status": 200
+}

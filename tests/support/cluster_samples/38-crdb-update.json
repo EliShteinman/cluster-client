@@ -1,0 +1,9 @@
+{
+  "body": {
+    "id": "fe7f2521-11ad-4809-b36a-3e75e84e1cf7",
+    "status": "queued"
+  },
+  "method": "PATCH",
+  "path": "/v1/crdbs/e6a13094-bebc-4746-93d1-9c71d53a8134",
+  "status": 200
+}

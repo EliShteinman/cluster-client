@@ -1,0 +1,13 @@
+{
+  "body": {
+    "acl": "+@read ~probe:*",
+    "action_uid": "484c1b9e-fba2-4327-ac6d-ff7292f489a3",
+    "max_version": "9999",
+    "min_version": "6.2",
+    "name": "probe-db-app-acl",
+    "uid": 3
+  },
+  "method": "PUT",
+  "path": "/v1/redis_acls/3",
+  "status": 200
+}

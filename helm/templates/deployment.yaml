@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cluster-client.fullname" . }}
+  labels:
+    {{- include "cluster-client.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cluster-client.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/files: {{ include (print $.Template.BasePath "/configmap-files.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/collector: {{ include (print $.Template.BasePath "/configmap-collector.yaml") . | sha256sum }}
+        checksum/collector-secret: {{ include (print $.Template.BasePath "/secret-collector.yaml") . | sha256sum }}
+      labels:
+        {{- include "cluster-client.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ include "cluster-client.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "cluster-client.fullname" . }}
+            {{- if .Values.secret }}
+            - secretRef:
+                name: {{ include "cluster-client.fullname" . }}
+            {{- end }}
+          env:
+            - name: CLUSTER_CLIENT_SERVER__PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH
+              value: {{ .Values.files.schema | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH
+              value: {{ .Values.files.ignoredFields | quote }}
+            - name: CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH
+              value: {{ .Values.files.redactedFields | quote }}
+            - name: CLUSTER_CLIENT_LOG__FILE__PATH
+              value: {{ printf "%s/%s" .Values.logs.directory .Values.logs.app | quote }}
+            - name: CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH
+              value: {{ printf "%s/%s" .Values.logs.directory .Values.logs.failures | quote }}
+          {{- if .Values.collector.enabled }}
+            - name: CLUSTER_CLIENT_LOG__LEVEL
+              value: {{ .Values.collector.logLevel | quote }}
+            - name: CLUSTER_CLIENT_LOG__FILE__ENABLED
+              value: "true"
+            - name: CLUSTER_CLIENT_LOG__FILE__FORMAT
+              value: json
+            - name: CLUSTER_CLIENT_TELEMETRY__EXPORT_ENABLED
+              value: "true"
+            - name: CLUSTER_CLIENT_TELEMETRY__OTLP_ENDPOINT
+              value: http://127.0.0.1:4318
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: files
+              mountPath: {{ .Values.files.schema }}
+              subPath: response-schema.json
+              readOnly: true
+            - name: files
+              mountPath: {{ .Values.files.ignoredFields }}
+              subPath: ignored-fields.json
+              readOnly: true
+            - name: files
+              mountPath: {{ .Values.files.redactedFields }}
+              subPath: redacted-fields.json
+              readOnly: true
+            - name: logs
+              mountPath: {{ .Values.logs.directory }}
+        {{- if .Values.collector.enabled }}
+        - name: collector
+          image: {{ include "cluster-client.collectorImage" . | quote }}
+          imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+          args: ["--config=/etc/otelcol/config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: ELASTIC_ENDPOINT
+              value: {{ .Values.collector.elasticsearch.endpoint | quote }}
+            - name: ELASTIC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cluster-client.fullname" . }}-collector
+                  key: username
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cluster-client.fullname" . }}-collector
+                  key: password
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+          volumeMounts:
+            - name: collector
+              mountPath: /etc/otelcol
+              readOnly: true
+            - name: collector-state
+              mountPath: /var/lib/otelcol/file_storage
+            - name: logs
+              mountPath: {{ .Values.logs.directory }}
+              readOnly: true
+        {{- end }}
+      volumes:
+        - name: files
+          configMap:
+            name: {{ include "cluster-client.fullname" . }}-files
+        - name: logs
+          emptyDir:
+            sizeLimit: {{ .Values.logsSizeLimit }}
+        {{- if .Values.collector.enabled }}
+        - name: collector
+          configMap:
+            name: {{ include "cluster-client.fullname" . }}-collector
+        - name: collector-state
+          emptyDir: {}
+        {{- end }}

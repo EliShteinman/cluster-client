@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "cluster-client values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "replicaCount",
+    "domain",
+    "image",
+    "containerPort",
+    "service",
+    "route",
+    "files",
+    "logs",
+    "logsSizeLimit",
+    "config",
+    "secret",
+    "collector",
+    "resources"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "domain": {
+      "$ref": "#/$defs/optionalHost"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry",
+        "repository",
+        "tag",
+        "pullPolicy"
+      ],
+      "properties": {
+        "registry": {
+          "$ref": "#/$defs/host"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+([._/:-][a-z0-9]+)*$"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "containerPort": {
+      "$ref": "#/$defs/port"
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "host",
+        "tls"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/dnsLabel"
+        },
+        "host": {
+          "$ref": "#/$defs/optionalHost"
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "termination",
+            "insecureEdgeTerminationPolicy"
+          ],
+          "properties": {
+            "termination": {
+              "type": "string",
+              "enum": [
+                "edge",
+                "passthrough",
+                "reencrypt"
+              ]
+            },
+            "insecureEdgeTerminationPolicy": {
+              "type": "string",
+              "enum": [
+                "None",
+                "Allow",
+                "Redirect"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "files": {
+      "description": "Where each runtime file is mounted, one path per file",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "ignoredFields",
+        "redactedFields"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "ignoredFields": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "redactedFields": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "logs": {
+      "description": "The log folder shared with the collector, and each log file's name in it",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "directory",
+        "app",
+        "failures"
+      ],
+      "properties": {
+        "directory": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "app": {
+          "$ref": "#/$defs/fileName"
+        },
+        "failures": {
+          "$ref": "#/$defs/fileName"
+        }
+      }
+    },
+    "logsSizeLimit": {
+      "$ref": "#/$defs/quantity"
+    },
+    "config": {
+      "$ref": "#/$defs/environment"
+    },
+    "secret": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/environment"
+        },
+        {
+          "required": [
+            "CLUSTER_CLIENT_ACCESS__USERNAME",
+            "CLUSTER_CLIENT_ACCESS__PASSWORD"
+          ]
+        }
+      ]
+    },
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "logLevel",
+        "elasticsearch",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "tag",
+            "pullPolicy"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+([._/:-][a-z0-9]+)*$"
+            },
+            "tag": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never"
+              ]
+            }
+          }
+        },
+        "logLevel": {
+          "$ref": "#/$defs/logLevel"
+        },
+        "elasticsearch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "username",
+            "password",
+            "insecureSkipVerify"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "pattern": "^(https?://[^\\s]+)?$"
+            },
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "insecureSkipVerify": {
+              "type": "boolean"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "elasticsearch": {
+            "properties": {
+              "endpoint": {
+                "minLength": 1
+              },
+              "username": {
+                "minLength": 1
+              },
+              "password": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "$ref": "#/$defs/resources"
+    }
+  },
+  "$defs": {
+    "logLevel": {
+      "type": "string",
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG"
+      ]
+    },
+    "absolutePath": {
+      "type": "string",
+      "pattern": "^/[^\\s]*$"
+    },
+    "fileName": {
+      "type": "string",
+      "pattern": "^[^/\\s]+$"
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|Ki|Mi|Gi)?$"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "environment": {
+      "description": "CLUSTER_CLIENT_* env vars as strings; the service checks every value, and every field name inside a section, when it starts (README, Configuration). The image sets the host; the chart sets the port and the file paths from containerPort, files and logs.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^CLUSTER_CLIENT_[A-Z0-9_]+$",
+        "not": {
+          "enum": [
+            "CLUSTER_CLIENT_SERVER__HOST",
+            "CLUSTER_CLIENT_SERVER__PORT",
+            "CLUSTER_CLIENT_VALIDATION__SCHEMA_PATH",
+            "CLUSTER_CLIENT_VALIDATION__IGNORED_FIELDS_PATH",
+            "CLUSTER_CLIENT_VALIDATION__REDACTED_FIELDS_PATH",
+            "CLUSTER_CLIENT_LOG__FILE__PATH",
+            "CLUSTER_CLIENT_LOG__FAILURE_FILE__PATH"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "dnsLabel": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "host": {
+      "type": "string",
+      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "optionalHost": {
+      "type": "string",
+      "pattern": "^(([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "$ref": "#/$defs/quantity"
+            },
+            "memory": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        }
+      }
+    }
+  }
+}

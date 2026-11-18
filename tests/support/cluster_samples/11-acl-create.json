@@ -1,0 +1,12 @@
+{
+  "body": {
+    "acl": "+@all ~probe:*",
+    "max_version": "9999",
+    "min_version": "6.2",
+    "name": "probe-db-app-acl",
+    "uid": 3
+  },
+  "method": "POST",
+  "path": "/v1/redis_acls",
+  "status": 200
+}

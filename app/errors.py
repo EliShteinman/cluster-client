@@ -1,0 +1,61 @@
+from pathlib import Path
+from typing import ClassVar
+
+
+class ClusterClientError(Exception):
+    pass
+
+
+class ConfigFileLoadError(ClusterClientError):
+    content: ClassVar[str]
+
+    def __init__(self, *, path: Path, reason: str) -> None:
+        super().__init__(f"cannot load {self.content} from {path}: {reason}")
+
+
+class SchemaLoadError(ConfigFileLoadError):
+    content: ClassVar[str] = "the response schema"
+
+
+class FieldPathsLoadError(ConfigFileLoadError):
+    content: ClassVar[str] = "the field paths"
+
+
+class NonStandardJsonError(ClusterClientError, ValueError):
+    def __init__(self, *, constant: str) -> None:
+        super().__init__(f"{constant} is not a JSON value")
+
+
+class AccessDeniedError(ClusterClientError):
+    def __init__(self, *, header: str) -> None:
+        super().__init__(f"the {header} header is missing or does not hold the expected credentials")
+
+
+class RequestFailedError(ClusterClientError):
+    def __init__(self, *, reason: str, field: str | None = None, rule: str | None = None) -> None:
+        super().__init__(reason)
+        self.reason: str = reason
+        self.field: str | None = field
+        self.rule: str | None = rule
+
+
+class TargetUnreachableError(RequestFailedError):
+    def __init__(self, *, url: str, reason: str) -> None:
+        super().__init__(reason=f"cannot reach {url}: {reason}")
+
+
+class ConnectionFailedError(TargetUnreachableError):
+    pass
+
+
+class NoResponseError(TargetUnreachableError):
+    pass
+
+
+class InvalidTargetRequestError(RequestFailedError):
+    def __init__(self, *, url: str, reason: str) -> None:
+        super().__init__(reason=f"cannot send to {url}: {reason}")
+
+
+class ResponseRejectedError(RequestFailedError):
+    pass

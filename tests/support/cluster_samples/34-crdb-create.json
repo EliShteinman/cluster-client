@@ -1,0 +1,9 @@
+{
+  "body": {
+    "id": "cf052a62-b63c-400c-8ec4-a1dfd4fde0ed",
+    "status": "queued"
+  },
+  "method": "POST",
+  "path": "/v1/crdbs",
+  "status": 200
+}

@@ -1,0 +1,162 @@
+import functools
+import inspect
+import logging
+import time
+from collections.abc import Awaitable, Callable
+from typing import cast
+
+MILLISECONDS_PER_SECOND: int = 1000
+PATH_SEPARATOR: str = "."
+
+
+type CallHook = Callable[..., None]
+
+
+def log_debug[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    logger: logging.Logger = logging.getLogger(name=function.__module__)
+    name: str = function.__qualname__
+
+    def when_debug(*, hook: CallHook) -> CallHook:
+        def guarded(**details: object) -> None:
+            if logger.isEnabledFor(level=logging.DEBUG):
+                hook(**details)
+
+        return guarded
+
+    def on_call(*, arguments: dict[str, object]) -> None:
+        logger.debug(msg=f"{name} called with {arguments!r}")
+
+    def on_return(*, arguments: dict[str, object], result: object, duration_ms: float) -> None:
+        logger.debug(
+            msg=f"{name} returned {result!r} in {duration_ms} ms", extra={"duration_ms": duration_ms}
+        )
+
+    def on_error(*, arguments: dict[str, object], error: Exception, duration_ms: float) -> None:
+        logger.debug(msg=f"{name} raised {error!r} in {duration_ms} ms", extra={"duration_ms": duration_ms})
+
+    return wrap_call(
+        function=function,
+        on_call=when_debug(hook=on_call),
+        on_return=when_debug(hook=on_return),
+        on_error=when_debug(hook=on_error),
+    )
+
+
+def log_info[**P, R](
+    *, inputs: tuple[str, ...] = (), outputs: tuple[str, ...] = ()
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorate(function: Callable[P, R]) -> Callable[P, R]:
+        logger: logging.Logger = logging.getLogger(name=function.__module__)
+        name: str = function.__qualname__
+
+        def on_return(*, arguments: dict[str, object], result: object, duration_ms: float) -> None:
+            picked_inputs: dict[str, object] = pick_inputs(arguments=arguments, paths=inputs)
+            picked_outputs: dict[str, object] = {
+                path: read_path(source=result, path=path) for path in outputs
+            }
+            logger.info(
+                msg=line_of(
+                    name=name,
+                    inputs=picked_inputs,
+                    outcome=joined(values=picked_outputs),
+                    duration_ms=duration_ms,
+                ),
+                extra={"inputs": picked_inputs, "outputs": picked_outputs, "duration_ms": duration_ms},
+            )
+
+        def on_error(*, arguments: dict[str, object], error: Exception, duration_ms: float) -> None:
+            picked_inputs: dict[str, object] = pick_inputs(arguments=arguments, paths=inputs)
+            logger.info(
+                msg=line_of(
+                    name=name, inputs=picked_inputs, outcome=type(error).__name__, duration_ms=duration_ms
+                ),
+                extra={"inputs": picked_inputs, "error": type(error).__name__, "duration_ms": duration_ms},
+            )
+
+        return wrap_call(function=function, on_call=None, on_return=on_return, on_error=on_error)
+
+    return decorate
+
+
+def line_of(*, name: str, inputs: dict[str, object], outcome: str, duration_ms: float) -> str:
+    parts: list[str] = [
+        name,
+        joined(values=inputs),
+        f"-> {outcome}" if outcome else "",
+        f"in {duration_ms} ms",
+    ]
+    return " ".join(part for part in parts if part)
+
+
+def pick_inputs(*, arguments: dict[str, object], paths: tuple[str, ...]) -> dict[str, object]:
+    return {path: read_argument(arguments=arguments, path=path) for path in paths}
+
+
+def read_argument(*, arguments: dict[str, object], path: str) -> object:
+    argument_name: str
+    attribute_path: str
+    argument_name, _, attribute_path = path.partition(PATH_SEPARATOR)
+    return read_path(source=arguments.get(argument_name), path=attribute_path)
+
+
+def read_path(*, source: object, path: str) -> object:
+    value: object = source
+    for name in path.split(PATH_SEPARATOR) if path else []:
+        value = getattr(value, name, None)
+    return value
+
+
+def joined(*, values: dict[str, object]) -> str:
+    return " ".join(str(value) for value in values.values())
+
+
+def wrap_call[**P, R](
+    *, function: Callable[P, R], on_call: CallHook | None, on_return: CallHook, on_error: CallHook
+) -> Callable[P, R]:
+    signature: inspect.Signature = inspect.signature(obj=function)
+
+    def arguments_of(*args: object, **kwargs: object) -> dict[str, object]:
+        bound: inspect.BoundArguments = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        return dict(bound.arguments)
+
+    if inspect.iscoroutinefunction(obj=function):
+        coroutine_function: Callable[P, Awaitable[object]] = cast(
+            typ=Callable[P, Awaitable[object]], val=function
+        )
+
+        @functools.wraps(wrapped=function)
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> object:
+            arguments: dict[str, object] = arguments_of(*args, **kwargs)
+            if on_call is not None:
+                on_call(arguments=arguments)
+            started: float = time.perf_counter()
+            try:
+                result: object = await coroutine_function(*args, **kwargs)
+            except Exception as error:
+                on_error(arguments=arguments, error=error, duration_ms=elapsed_ms(started=started))
+                raise
+            on_return(arguments=arguments, result=result, duration_ms=elapsed_ms(started=started))
+            return result
+
+        return cast(typ=Callable[P, R], val=async_wrapper)
+
+    @functools.wraps(wrapped=function)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        arguments: dict[str, object] = arguments_of(*args, **kwargs)
+        if on_call is not None:
+            on_call(arguments=arguments)
+        started: float = time.perf_counter()
+        try:
+            result: R = function(*args, **kwargs)
+        except Exception as error:
+            on_error(arguments=arguments, error=error, duration_ms=elapsed_ms(started=started))
+            raise
+        on_return(arguments=arguments, result=result, duration_ms=elapsed_ms(started=started))
+        return result
+
+    return wrapper
+
+
+def elapsed_ms(*, started: float) -> float:
+    return round(number=(time.perf_counter() - started) * MILLISECONDS_PER_SECOND, ndigits=1)

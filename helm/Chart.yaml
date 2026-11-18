@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cluster-client
+description: Sends one request to the target named in it and returns the answer only if it passes the firewall schema
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

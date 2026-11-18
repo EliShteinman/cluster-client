@@ -1,0 +1,139 @@
+from fastapi.security import HTTPBasic
+from starlette.requests import Request
+
+from app.access import login_challenge
+from app.config.failures import FailureCode
+from app.config.settings import Settings
+from app.config.telemetry import TelemetrySettings
+from app.failures.answers import failure_codes
+from app.logger.decorators import log_debug
+from app.models import FailureBody, TargetRequest
+from app.routes.read_request import header_of_field
+
+type OpenApiObject = dict[str, object]
+
+
+class BasicAuthDocumentation(HTTPBasic):
+    async def __call__(self, request: Request) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return None
+
+
+@log_debug
+def failure_responses(*, settings: Settings) -> dict[int | str, OpenApiObject]:
+    codes: list[FailureCode] = failure_codes(settings=settings.failures)
+    statuses: list[int] = sorted({code.status_code for code in codes})
+    return {
+        status: documented_failure(
+            status=status,
+            error_codes=[code.error_code for code in codes if code.status_code == status],
+            settings=settings,
+        )
+        for status in statuses
+    }
+
+
+@log_debug
+def documented_failure(*, status: int, error_codes: list[str], settings: Settings) -> OpenApiObject:
+    headers: OpenApiObject = {
+        settings.failures.error_header: {
+            "description": "On every answer the cluster client writes itself; never on a target answer",
+            "schema": {"type": "string", "enum": error_codes},
+        }
+    }
+    if status == settings.failures.rejected.status_code:
+        headers[settings.failures.target_status_header] = {
+            "description": f"The target's status, on {settings.failures.rejected.error_code} only",
+            "schema": {"type": "integer"},
+        }
+    if status == settings.failures.unauthorized.status_code:
+        headers[settings.access.challenge_header] = {
+            "description": f"On {settings.failures.unauthorized.error_code}: the login the client asks for",
+            "schema": {"type": "string", "example": login_challenge(settings=settings.access)},
+        }
+    return {
+        "model": FailureBody,
+        "description": ", ".join(error_codes),
+        "headers": {**headers, **trace_response_header(settings=settings.telemetry)},
+    }
+
+
+@log_debug
+def trace_response_header(*, settings: TelemetrySettings) -> OpenApiObject:
+    return {
+        settings.trace_response_header: {
+            "description": "The trace of this call (the manager's, if sent); its log lines carry its id",
+            "schema": {"type": "string"},
+        },
+        settings.exposed_headers_header: {
+            "description": f"Always {settings.trace_response_header}, set by OpenTelemetry with it",
+            "schema": {"type": "string"},
+        },
+    }
+
+
+@log_debug
+def request_documentation(*, settings: Settings) -> OpenApiObject:
+    return {
+        "description": forwarding_rule(settings=settings),
+        "parameters": [
+            *target_request_headers(settings=settings),
+            *documented_target_headers(settings=settings),
+            trace_request_header(settings=settings.telemetry),
+        ],
+        "requestBody": {
+            "required": False,
+            "description": "Sent to the target as is",
+            "content": {"*/*": {"schema": {}}},
+        },
+    }
+
+
+@log_debug
+def trace_request_header(*, settings: TelemetrySettings) -> OpenApiObject:
+    return {
+        "name": settings.trace_header,
+        "in": "header",
+        "required": False,
+        "description": "The manager's trace; the call to the target and every log line continue it",
+        "schema": {"type": "string"},
+    }
+
+
+@log_debug
+def forwarding_rule(*, settings: Settings) -> str:
+    prefix: str = settings.headers.target_prefix
+    refused: str = ", ".join(prefix + name for name in sorted(settings.headers.refused_target_headers))
+    return (
+        f"Every header that starts with {prefix} is sent to the target without the prefix "
+        f"({prefix}authorization becomes authorization); no other header reaches the target. "
+        f"{settings.headers.method} and {settings.headers.url} are read, never sent. "
+        f"Refused with {settings.failures.invalid_request.error_code}: {prefix} alone (no name), {refused}."
+    )
+
+
+@log_debug
+def target_request_headers(*, settings: Settings) -> list[OpenApiObject]:
+    field_schemas: OpenApiObject = TargetRequest.model_json_schema()["properties"]
+    return [
+        {
+            "name": header,
+            "in": "header",
+            "required": TargetRequest.model_fields[field].is_required(),
+            "schema": field_schemas[field],
+        }
+        for field, header in header_of_field(settings=settings.headers).items()
+    ]
+
+
+@log_debug
+def documented_target_headers(*, settings: Settings) -> list[OpenApiObject]:
+    return [
+        {
+            "name": settings.headers.target_prefix + name,
+            "in": "header",
+            "required": False,
+            "description": f"Sent to the target as {name}; left out, the target gets no {name}",
+            "schema": {"type": "string"},
+        }
+        for name in settings.headers.documented_target_headers
+    ]

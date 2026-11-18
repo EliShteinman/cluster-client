@@ -1,0 +1,22 @@
+[
+  "$.access_token",
+  "$.cluster_ssh_public_key",
+  "$.proxy_certificate",
+  "$.syncer_certificate",
+  "$.api_cert",
+  "$.api_key",
+  "$.cm_cert",
+  "$.cm_key",
+  "$.metrics_exporter_cert",
+  "$.metrics_exporter_key",
+  "$.proxy_cert",
+  "$.proxy_key",
+  "$.syncer_cert",
+  "$.syncer_key",
+  "$.authentication_ssl_crdt_certs",
+  "$[*].authentication_ssl_crdt_certs",
+  "$.instances[*].server_cert",
+  "$.crdbs[*].instances[*].server_cert",
+  "$.crdt_sources[*].server_cert",
+  "$[*].crdt_sources[*].server_cert"
+]

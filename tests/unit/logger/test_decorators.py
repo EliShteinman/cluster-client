@@ -16,3 +16,12 @@ def test_a_step_without_outputs_has_no_arrow(caplog: pytest.LogCaptureFixture) -
     caplog.set_level(level="INFO")
     greet(name="eli")
     assert "->" not in info_message(caplog=caplog)
+
+
+@log_info(inputs=("missing",), outputs=("no.such.path",))
+def wrongly_logged(*, name: str) -> str:
+    return name
+
+
+def test_a_wrong_log_path_does_not_break_the_call() -> None:
+    assert wrongly_logged(name="eli") == "eli"

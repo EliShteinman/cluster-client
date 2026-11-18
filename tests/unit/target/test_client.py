@@ -13,7 +13,7 @@ from app.errors import (
 from app.models import Answer, TargetRequest
 from app.target.client import returned_headers, send_to_target
 from tests.support.fake_target_api import CONNECT_FAILURE, FakeTargetApi, SentRequest
-from tests.support.requests import TARGET_REQUEST, TARGET_URL
+from tests.support.target_request import TARGET_REQUEST, TARGET_URL
 
 FORWARDING: ForwardingSettings = ForwardingSettings()
 FULL_REQUEST: TargetRequest = TARGET_REQUEST.model_copy(

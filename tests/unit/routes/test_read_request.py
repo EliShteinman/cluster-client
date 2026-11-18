@@ -10,7 +10,7 @@ from app.config.settings import NoEnvFileSettings, Settings
 from app.models import TargetRequest
 from app.routes.read_request import read_target_request
 from tests.support.access import ACCESS
-from tests.support.requests import TARGET_HEADERS, TARGET_URL
+from tests.support.target_request import TARGET_HEADERS, TARGET_URL
 
 SETTINGS: Settings = NoEnvFileSettings(
     access=ACCESS,

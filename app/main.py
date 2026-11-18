@@ -23,6 +23,7 @@ from app.logger.setup import configure_logging, reset_logging
 from app.routes.health_routes import health_router
 from app.routes.target_routes import build_target_router
 from app.rules.response_rules import load_rules
+from app.state import rules_of, settings_of, tracer_provider_of
 from app.telemetry import build_tracer_provider, start_telemetry, stop_telemetry
 
 
@@ -55,12 +56,12 @@ def excluded_urls(*, paths: frozenset[str]) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    settings: Settings = app.state.settings
-    tracer_provider: TracerProvider = app.state.tracer_provider
+    settings: Settings = settings_of(state=app.state)
+    tracer_provider: TracerProvider = tracer_provider_of(state=app.state)
     configure_logging(settings=settings.log)
     start_telemetry(provider=tracer_provider)
     app.state.rules = load_rules(settings=settings.validation)
-    check_own_answers(rules=app.state.rules, settings=settings)
+    check_own_answers(rules=rules_of(state=app.state), settings=settings)
     yield
     stop_telemetry(provider=tracer_provider)
     reset_logging()

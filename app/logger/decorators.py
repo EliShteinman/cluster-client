@@ -96,13 +96,14 @@ def read_argument(*, arguments: dict[str, object], path: str) -> object:
     argument_name: str
     attribute_path: str
     argument_name, _, attribute_path = path.partition(PATH_SEPARATOR)
-    return read_path(source=arguments[argument_name], path=attribute_path)
+    return read_path(source=arguments.get(argument_name), path=attribute_path)
 
 
 def read_path(*, source: object, path: str) -> object:
-    if not path:
-        return source
-    return functools.reduce(getattr, path.split(PATH_SEPARATOR), source)
+    value: object = source
+    for name in path.split(PATH_SEPARATOR) if path else []:
+        value = getattr(value, name, None)
+    return value
 
 
 def joined(*, values: dict[str, object]) -> str:

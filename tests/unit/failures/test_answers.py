@@ -29,8 +29,8 @@ from app.models import Answer, FailureRecord
 from app.rules.field_paths import FieldPath
 from app.rules.schema import validate_body
 from tests.support.access import ACCESS
-from tests.support.requests import TARGET_REQUEST, TARGET_URL
 from tests.support.rules import DRAFT_04, RULES, validator_of
+from tests.support.target_request import TARGET_REQUEST, TARGET_URL
 
 SETTINGS: Settings = NoEnvFileSettings(access=ACCESS)
 CONNECTION_FAILED: ConnectionFailedError = ConnectionFailedError(url=TARGET_URL, reason="refused")

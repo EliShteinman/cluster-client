@@ -16,6 +16,7 @@ from app.routes.target_openapi import (
     trace_response_header,
 )
 from app.rules.response_rules import ResponseRules
+from app.state import rules_of, settings_of
 from app.target.client import send_to_target
 from app.target.response_builder import build_response
 
@@ -52,15 +53,15 @@ def build_target_router(*, settings: Settings) -> APIRouter:
 
 @log_debug
 def require_access(*, request: Request) -> None:
-    settings: Settings = request.app.state.settings
+    settings: Settings = settings_of(state=request.app.state)
     check_access(header_value=request.headers.get(settings.access.header, ""), settings=settings.access)
 
 
 @log_info(outputs=("status_code",))
 @log_debug
 def target_endpoint(*, request: Request, body: Annotated[bytes, Depends(dependency=read_body)]) -> Response:
-    settings: Settings = request.app.state.settings
-    rules: ResponseRules = request.app.state.rules
+    settings: Settings = settings_of(state=request.app.state)
+    rules: ResponseRules = rules_of(state=request.app.state)
     target_request: TargetRequest = read_target_request(
         headers=dict(request.headers), body=body, settings=settings
     )

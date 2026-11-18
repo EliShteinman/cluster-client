@@ -13,6 +13,7 @@ from app.failures.answers import logged_answer
 from app.logger.decorators import log_debug
 from app.models import Answer, FailureDetails
 from app.rules.response_rules import ResponseRules
+from app.state import rules_of, settings_of
 
 
 @log_debug
@@ -22,7 +23,7 @@ def reason_text(*, detail: object) -> str:
 
 @log_debug
 def refused_request_response(request: Request, error: HTTPException) -> Response:
-    settings: Settings = request.app.state.settings
+    settings: Settings = settings_of(state=request.app.state)
     answer: Answer = own_failure_answer(
         request=request,
         code=settings.failures.invalid_request,
@@ -38,7 +39,7 @@ def refused_request_response(request: Request, error: HTTPException) -> Response
 
 @log_debug
 def access_denied_response(request: Request, error: AccessDeniedError) -> Response:
-    settings: Settings = request.app.state.settings
+    settings: Settings = settings_of(state=request.app.state)
     answer: Answer = own_failure_answer(
         request=request, code=settings.failures.unauthorized, reason=str(object=error), level=logging.WARNING
     )
@@ -50,7 +51,7 @@ def access_denied_response(request: Request, error: AccessDeniedError) -> Respon
 
 @log_debug
 def internal_error_response(request: Request, error: Exception) -> Response:
-    settings: Settings = request.app.state.settings
+    settings: Settings = settings_of(state=request.app.state)
     answer: Answer = own_failure_answer(
         request=request,
         code=settings.failures.internal_error,
@@ -62,8 +63,8 @@ def internal_error_response(request: Request, error: Exception) -> Response:
 
 @log_debug
 def own_failure_answer(*, request: Request, code: FailureCode, reason: str, level: int) -> Answer:
-    settings: Settings = request.app.state.settings
-    rules: ResponseRules = request.app.state.rules
+    settings: Settings = settings_of(state=request.app.state)
+    rules: ResponseRules = rules_of(state=request.app.state)
     return logged_answer(
         code=code,
         details=FailureDetails(error=code.error_code, reason=reason),

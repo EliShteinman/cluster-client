@@ -26,12 +26,12 @@ schema) → cluster-client → target. Diagrams: `docs/diagrams/` (PNG next to e
 
 ## The request flow (the whole program)
 
-`POST /` → `target_endpoint` (`app/routes/target_routes.py:61`) is the orchestrator. Read it first; every step is one
+`POST /` → `target_endpoint` (`app/routes/target_routes.py:62`) is the orchestrator. Read it first; every step is one
 visible call. Diagram: `docs/diagrams/flow.drawio.png`; every failure: `docs/failures.md`.
 
-1. **Trace.** `FastAPIInstrumentor` (set up in `create_app`, `app/main.py:30`) continues the manager's `traceparent`
-   or starts a trace. Requests to `log.quiet_paths` get no span (`excluded_urls`, `app/main.py:52`).
-2. **Access.** `require_access` (`target_routes.py:54`), a route dependency, runs before the body is read. It passes
+1. **Trace.** `FastAPIInstrumentor` (set up in `create_app`, `app/main.py:31`) continues the manager's `traceparent`
+   or starts a trace. Requests to `log.quiet_paths` get no span (`excluded_urls`, `app/main.py:53`).
+2. **Access.** `require_access` (`target_routes.py:55`), a route dependency, runs before the body is read. It passes
    only the value of `settings.access.header` (`authorization`) to `check_access` (`app/access.py:10`): scheme
    compared in any case, credentials compared in constant time with `expected_credentials` (`access.py:20`).
    Wrong → `AccessDeniedError` → `access_denied_response` → **401** `unauthorized` + `www-authenticate`
@@ -74,10 +74,10 @@ visible call. Diagram: `docs/diagrams/flow.drawio.png`; every failure: `docs/fai
    `x-edge-target-status` when the target answered, and the body from `failure_body` (`app/failures/body.py:7`),
    cut to `rules.error_limits`.
 8. **Own answers.** Everything else the service answers itself goes through the exception handlers of
-   `app/failures/exception_handlers.py` and `own_failure_answer` (`:64`) to the same `logged_answer`:
-   `HTTPException` (bad header, wrong path 404, wrong method 405) → `refused_request_response` (`:24`, keeps the
+   `app/failures/exception_handlers.py` and `own_failure_answer` (`:65`) to the same `logged_answer`:
+   `HTTPException` (bad header, wrong path 404, wrong method 405) → `refused_request_response` (`:25`, keeps the
    exception's status and headers, e.g. `allow`), `invalid_request`, WARNING; `AccessDeniedError` →
-   `access_denied_response` (`:40`), WARNING; any other exception → `internal_error_response` (`:52`), **500**
+   `access_denied_response` (`:41`), WARNING; any other exception → `internal_error_response` (`:53`), **500**
    `internal_error`, the error and its traceback, ERROR.
 9. **Return.** `Response(content, status_code, headers)`; OpenTelemetry adds `traceresponse`.
 
@@ -88,11 +88,11 @@ Diagram: `docs/diagrams/startup.drawio.png`.
 1. `docker/entrypoint.py` builds `Settings()` from env and `.env`; `run_local.py` builds `NoEnvFileSettings` in code.
    Pydantic validation stops a bad value (see "Config" below and `Settings.own_headers_keep_their_prefixes`,
    `app/config/settings.py:42`).
-2. `create_app(settings)` (`app/main.py:30`): a `TracerProvider` of its own (`build_tracer_provider`,
+2. `create_app(settings)` (`app/main.py:31`): a `TracerProvider` of its own (`build_tracer_provider`,
    `app/telemetry.py:19`, never global), `FastAPIInstrumentor`, `QuietPathsMiddleware`, three exception handlers,
-   `health_router`, `build_target_router` (`target_routes.py:24`, with the OpenAPI of `target_openapi.py`).
+   `health_router`, `build_target_router` (`target_routes.py:25`, with the OpenAPI of `target_openapi.py`).
 3. `serve` (`app/server.py:9`) → `uvicorn.run` (`log_config=None`, no `server`/`date` headers).
-4. `lifespan` (`app/main.py:57`): `configure_logging`, `start_telemetry`, then
+4. `lifespan` (`app/main.py:58`): `configure_logging`, `start_telemetry`, then
    `app.state.rules = load_rules(...)` (`app/rules/response_rules.py:24`):
    - `load_schema` (`app/rules/schema.py:19`): a JSON object, `validator_for` (the draft it declares), `check_schema`;
    - `load_field_paths` (`app/rules/field_paths.py:21`) twice: a JSON list of strings, each parsed by `parse_field_path`
@@ -114,9 +114,10 @@ Diagram: `docs/diagrams/startup.drawio.png`.
 
 | File | Contents |
 |---|---|
-| `app/main.py` | `create_app(settings)` (`:30`), `excluded_urls(paths)` (`:52`, anchored regexes for `FastAPIInstrumentor`), `lifespan(app)` (`:57`) |
+| `app/main.py` | `create_app(settings)` (`:31`), `excluded_urls(paths)` (`:53`, anchored regexes for `FastAPIInstrumentor`), `lifespan(app)` (`:58`) |
 | `app/server.py` | `serve(app, settings)` → `uvicorn.run` |
 | `app/telemetry.py` | `build_tracer_provider` (OTLP exporter only when `telemetry.export_enabled`), `start_telemetry` (`LoggingInstrumentor` with `enable_log_auto_instrumentation=False`, `TraceResponsePropagator`, `RequestsInstrumentor`), `stop_telemetry` |
+| `app/state.py` | `settings_of`, `rules_of`, `tracer_provider_of`: the one place that reads `app.state`, each checks the type and returns it typed |
 | `app/access.py` | `check_access(header_value, settings)` and `expected_credentials(settings)`: not decorated, they hold the password; `login_challenge(settings)`: the `www-authenticate` value, used by the 401 handler and by `/docs` |
 | `app/target/client.py` | `send_to_target` (total timeout, `@log_info` only), `call_target` (not decorated), `classified_error`, `was_not_sent`, `returned_headers`; `urllib3.disable_warnings(InsecureRequestWarning)` at import |
 | `app/target/response_builder.py` | `build_response(target_response, rules, settings)`, `too_deep(settings)` |
@@ -135,7 +136,7 @@ Diagram: `docs/diagrams/startup.drawio.png`.
 | `app/failures/body.py` | `failure_body(details, limits, settings)`, `reason_parts`, `shortened_field` |
 | `app/failures/exception_handlers.py` | `refused_request_response` (its reason is `reason_text`: a string as is, a list of refusals as JSON), `reason_text`, `access_denied_response`, `internal_error_response`, `own_failure_answer` |
 | `app/failures/own_answers_check.py` | `check_own_answers(rules, settings)`, `too_long`, `sample_details`, `schema_problems` |
-| `app/logger/decorators.py` | `log_debug`, `log_info(inputs, outputs)`, and their helpers `line_of` (the INFO line: name, inputs, `-> outputs` only when there are any, duration), `pick_inputs`, `read_argument`, `read_path`, `joined`, `wrap_call`, `elapsed_ms` |
+| `app/logger/decorators.py` | `log_debug`, `log_info(inputs, outputs)`, and their helpers (`read_argument` and `read_path` give `None` for a wrong path, so logging never breaks a call) `line_of` (the INFO line: name, inputs, `-> outputs` only when there are any, duration), `pick_inputs`, `read_argument`, `read_path`, `joined`, `wrap_call`, `elapsed_ms` |
 | `app/logger/setup.py` | `configure_logging(settings)`, `reset_logging()`, `install` (adds a `QuietRequestFilter` to every handler) |
 | `app/logger/handlers.py` | `console_handler`, `file_handler` (rotating, creates the folder), `prepare_handler` |
 | `app/logger/formatters.py` | `JsonFormatter`, `payload_of` (`timestamp`, `level`, `logger`, `message`, `trace_id`, `span_id`, `extra`, `exception`), `trace_fields_of`, `extra_fields_of`, `LineFormatter` with `with_trace_placeholders` (a line outside a trace shows `-`, on a copy of the record), `build_formatter` |
@@ -192,7 +193,7 @@ Diagram: `docs/diagrams/startup.drawio.png`.
    concept; inherit where models share fields.
 8. **Tools must pass**: `uv run ruff check .` and `uv run ruff format .` (line length 110),
    `uv run basedpyright` (strict, on `app`, `tests`, `docker`, `run_local.py`), `uv run lint-imports` (layers in
-   `pyproject.toml`: `app`, and inside it `app.rules`, `app.target` and `app.config`; a new module needs a layer), `uv run pytest`. Pre-commit runs the first four.
+   `pyproject.toml`: `app` (with `state` between `failures | target | telemetry` and `access | rules`), and inside it `app.rules`, `app.target` and `app.config`; a new module needs a layer), `uv run pytest`. Pre-commit runs the first four.
 
 ## Decisions that look odd but are deliberate
 
@@ -279,6 +280,9 @@ Keep every one of these. Do not "fix" them without the owner.
   sent, and a bug on the manager's side, so no retry.
 - The long `reason` text of `requests` errors is kept as is.
 - **One refusal at a time**: a model error is reported before a refused header.
+- **`/health/ready` answers `up` and checks nothing more** (owner's decision 2026-11-18): uvicorn serves requests
+  only after `lifespan` finished, so the schema and field files are loaded and checked; a failed start exits. A
+  neutral tool holds no list of targets to check.
 - **404 and 405 are not described in `/docs`** (owner's decision 2026-11-17); the general rule (`x-edge-error` on every
   own answer) is in the docs pages.
 - **The firewall schema is checked by the draft it declares** (`validator_for`): draft-04 today, the firewall's
@@ -324,8 +328,8 @@ Keep every one of these. Do not "fix" them without the owner.
   schemas declare draft-04 and go through `validator_for` like the code.
 - `tests/support/cluster_samples/`: 43 real Redis Enterprise answers, passwords replaced; `tests/unit/rules/test_samples.py`
   runs every one through the real files.
-- Layout: `tests/unit/` mirrors `app/`: `config/`, `routes/`, `rules/`, `target/`, `failures/`, `logger/`, and `test_access.py`
-  for the top-level `access.py`; one file per module or concept. 231 tests today.
+- Layout: `tests/unit/` mirrors `app/`: `config/`, `routes/`, `rules/`, `target/`, `failures/`, `logger/`, and `test_access.py` / `test_state.py`
+  for the top-level `access.py` / `state.py`; one file per module or concept. 235 tests today.
 - Run: `uv run pytest`.
 
 ## Diagrams and docs
@@ -347,7 +351,6 @@ Keep every one of these. Do not "fix" them without the owner.
 
 ## Open items (do not implement without the owner)
 
-- `/health/ready` should check something real (today it always answers `up`).
 - A header sent twice (two `x-target-*` with the same name) reaches the target with its first value only
   (`dict(request.headers)`). The same holds for the answer: `returned_headers` builds a `dict[str, str]`, so a header
   the target sends several times (e.g. `Set-Cookie`) reaches the manager as one comma-joined value. To check: how

@@ -34,6 +34,10 @@ The chain is: manager (redis-enterprise-services) → NGINX → DataPower → cl
 
 ## One call
 
+The call that works, step by step, with each failure only as a stub:
+
+![The happy path](diagrams/happy-path.drawio.png)
+
 ![One successful and one rejected call](diagrams/sequence.drawio.png)
 
 The full flow, with every branch and failure, is in [failures.md](failures.md) and in this diagram:

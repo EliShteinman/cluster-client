@@ -16,6 +16,7 @@ Each diagram is a `.drawio` file (open it in draw.io) and a PNG of it next to it
 | Diagram | Shows |
 |---|---|
 | [context](diagrams/context.drawio.png) | Manager → NGINX → DataPower → cluster-client → target, and what each adds or checks |
+| [happy-path](diagrams/happy-path.drawio.png) | The happy path only: the five steps of a call that works, the modules and data between them; each failure is a stub |
 | [flow](diagrams/flow.drawio.png) | The request flow with every branch, every failure and where it is logged |
 | [sequence](diagrams/sequence.drawio.png) | One successful and one rejected call, with `traceparent` and `traceresponse` |
 | [class-diagram](diagrams/class-diagram.drawio.png) | Every module of `app/`, its functions, models, errors and settings, by import layer |

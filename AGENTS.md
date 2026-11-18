@@ -27,7 +27,7 @@ schema) → cluster-client → target. Diagrams: `docs/diagrams/` (PNG next to e
 ## The request flow (the whole program)
 
 `POST /` → `target_endpoint` (`app/routes/target_routes.py:62`) is the orchestrator. Read it first; every step is one
-visible call. Diagram: `docs/diagrams/flow.drawio.png`; every failure: `docs/failures.md`.
+visible call. Diagrams: `docs/diagrams/happy-path.drawio.png` (the call that works), `docs/diagrams/flow.drawio.png` (every branch); every failure: `docs/failures.md`.
 
 1. **Trace.** `FastAPIInstrumentor` (set up in `create_app`, `app/main.py:31`) continues the manager's `traceparent`
    or starts a trace. Requests to `log.quiet_paths` get no span (`excluded_urls`, `app/main.py:53`).
@@ -334,7 +334,7 @@ Keep every one of these. Do not "fix" them without the owner.
 
 ## Diagrams and docs
 
-- `docs/diagrams/`: `context`, `flow`, `sequence`, `class-diagram` (modules), `startup`, `deployment`. Each is a
+- `docs/diagrams/`: `context`, `happy-path` (the call that works, failures as stubs; read it first), `flow`, `sequence`, `class-diagram` (modules), `startup`, `deployment`. Each is a
   `.drawio` and a `.drawio.png` exported from it (`drawio -x -f png -e -b 20 -o <name>.drawio.png <name>.drawio`).
 - When a code change makes a diagram or a page in `docs/` wrong, update it in the same task (edit the cells in place,
   keep the layout, export the PNG again and look at it). Do not touch diagrams for changes they do not show.
